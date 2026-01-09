@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebView Pool 风险测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .section {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .data-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid #4caf50;
+        }
+        .status.warning {
+            background: rgba(255, 152, 0, 0.3);
+            border: 2px solid #ff9800;
+        }
+        .status.danger {
+            background: rgba(244, 67, 54, 0.3);
+            border: 2px solid #f44336;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 WebView Pool 风险测试</h1>
+        
+        <div class="info">
+            <strong>测试说明：</strong><br>
+            1. 在账号 A 下，点击"写入测试数据"<br>
+            2. 关闭页面，切换到账号 B<br>
+            3. 再次打开此页面，检查是否还能看到账号 A 的数据
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="section">
+            <h2>📝 操作</h2>
+            <input type="text" id="testKey" placeholder="输入测试键名（如：test_account_A）" value="test_account_A">
+            <input type="text" id="testValue" placeholder="输入测试值（如：account_A_data）" value="account_A_data">
+            <button onclick="writeTestData()">✅ 写入测试数据</button>
+            <button onclick="readAllData()">📖 读取所有数据</button>
+            <button onclick="copyAllData()" style="background: rgba(76, 175, 80, 0.3); border-color: #4caf50;">📋 复制所有数据（JSON）</button>
+            <button onclick="clearAllData()">🗑️ 清空所有数据</button>
+        </div>
+
+        <div class="section">
+            <h2>💾 localStorage 数据</h2>
+            <div id="localStorageData" class="data-display">点击"读取所有数据"查看</div>
+        </div>
+
+        <div class="section">
+            <h2>📦 sessionStorage 数据</h2>
+            <div id="sessionStorageData" class="data-display">点击"读取所有数据"查看</div>
+        </div>
+
+        <div class="section">
+            <h2>🍪 Cookie 数据</h2>
+            <div id="cookieData" class="data-display">点击"读取所有数据"查看</div>
+        </div>
+
+        <div class="section">
+            <h2>ℹ️ 页面信息</h2>
+            <div id="pageInfo" class="data-display"></div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时自动显示信息
+        window.onload = function() {
+            showStatus('页面已加载', 'success');
+            readAllData();
+            updatePageInfo();
+        };
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+        }
+
+        function writeTestData() {
+            const key = document.getElementById('testKey').value || 'test_account_A';
+            const value = document.getElementById('testValue').value || 'account_A_data_' + Date.now();
+            
+            try {
+                // 写入 localStorage
+                localStorage.setItem(key, value);
+                
+                // 写入 sessionStorage
+                sessionStorage.setItem(key + '_session', value + '_session');
+                
+                // 写入 Cookie
+                document.cookie = key + '_cookie=' + value + '_cookie; path=/; max-age=3600';
+                
+                showStatus('✅ 数据写入成功！键: ' + key, 'success');
+                readAllData();
+            } catch (e) {
+                showStatus('❌ 写入失败: ' + e.message, 'danger');
+            }
+        }
+
+        function readAllData() {
+            // 读取 localStorage
+            let lsData = {};
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    lsData[key] = localStorage.getItem(key);
+                }
+            } catch (e) {
+                lsData = {error: e.message};
+            }
+            document.getElementById('localStorageData').textContent = 
+                Object.keys(lsData).length > 0 
+                    ? JSON.stringify(lsData, null, 2)
+                    : '（空）';
+
+            // 读取 sessionStorage
+            let ssData = {};
+            try {
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    ssData[key] = sessionStorage.getItem(key);
+                }
+            } catch (e) {
+                ssData = {error: e.message};
+            }
+            document.getElementById('sessionStorageData').textContent = 
+                Object.keys(ssData).length > 0 
+                    ? JSON.stringify(ssData, null, 2)
+                    : '（空）';
+
+            // 读取 Cookie
+            const cookies = document.cookie || '（空）';
+            document.getElementById('cookieData').textContent = cookies;
+
+            // 检查是否有残留数据
+            if (Object.keys(lsData).length > 0 || Object.keys(ssData).length > 0 || cookies !== '（空）') {
+                showStatus('⚠️ 检测到数据！可能是跨账号残留', 'warning');
+            } else {
+                showStatus('✅ 未检测到数据', 'success');
+            }
+        }
+
+        function copyAllData() {
+            try {
+                // 读取所有数据
+                let lsData = {};
+                try {
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        lsData[key] = localStorage.getItem(key);
+                    }
+                } catch (e) {
+                    lsData = {error: e.message};
+                }
+
+                let ssData = {};
+                try {
+                    for (let i = 0; i < sessionStorage.length; i++) {
+                        const key = sessionStorage.key(i);
+                        ssData[key] = sessionStorage.getItem(key);
+                    }
+                } catch (e) {
+                    ssData = {error: e.message};
+                }
+
+                // 解析 Cookie
+                const cookies = document.cookie || '';
+                let cookieObj = {};
+                if (cookies.trim() !== '') {
+                    cookies.split(';').forEach(function(c) {
+                        const parts = c.trim().split('=');
+                        if (parts.length >= 2) {
+                            cookieObj[parts[0]] = parts.slice(1).join('=');
+                        }
+                    });
+                }
+
+                // 页面信息
+                const pageInfo = {
+                    'URL': window.location.href,
+                    'Origin': window.location.origin,
+                    'User Agent': navigator.userAgent,
+                    '时间戳': new Date().toISOString()
+                };
+
+                // 组合所有数据
+                const allData = {
+                    '测试时间': new Date().toISOString(),
+                    '页面信息': pageInfo,
+                    'localStorage': Object.keys(lsData).length > 0 ? lsData : '（空）',
+                    'sessionStorage': Object.keys(ssData).length > 0 ? ssData : '（空）',
+                    'Cookie': Object.keys(cookieObj).length > 0 ? cookieObj : '（空）',
+                    'Cookie原始字符串': cookies || '（空）'
+                };
+
+                // 格式化为 JSON
+                const jsonString = JSON.stringify(allData, null, 2);
+
+                // 复制到剪贴板
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(jsonString).then(function() {
+                        showStatus('✅ 所有数据已复制到剪贴板！', 'success');
+                    }).catch(function(err) {
+                        // 降级方案：使用传统方法
+                        fallbackCopy(jsonString);
+                    });
+                } else {
+                    // 降级方案：使用传统方法
+                    fallbackCopy(jsonString);
+                }
+            } catch (e) {
+                showStatus('❌ 复制失败: ' + e.message, 'danger');
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showStatus('✅ 所有数据已复制到剪贴板！', 'success');
+            } catch (err) {
+                showStatus('❌ 复制失败，请手动复制', 'danger');
+                // 如果复制失败，至少显示数据让用户手动复制
+                alert('复制失败，数据如下：\n\n' + text);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function clearAllData() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                // 清除所有 Cookie
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                showStatus('✅ 所有数据已清空', 'success');
+                readAllData();
+            } catch (e) {
+                showStatus('❌ 清空失败: ' + e.message, 'danger');
+            }
+        }
+
+        function updatePageInfo() {
+            const info = {
+                'URL': window.location.href,
+                'Origin': window.location.origin,
+                'User Agent': navigator.userAgent,
+                '时间戳': new Date().toISOString(),
+                'localStorage 支持': typeof(Storage) !== "undefined" ? '是' : '否',
+                'sessionStorage 支持': typeof(sessionStorage) !== "undefined" ? '是' : '否'
+            };
+            document.getElementById('pageInfo').textContent = JSON.stringify(info, null, 2);
+        }
+
+        // 定期更新数据（每5秒）
+        setInterval(function() {
+            readAllData();
+        }, 5000);
+    </script>
+</body>
+</html>
