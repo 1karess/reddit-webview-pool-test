@@ -162,27 +162,39 @@
     </div>
 
     <script>
-        // 页面加载时自动写入一次标记（如果还没有），然后读取数据
+        // 页面加载时自动写入一次测试数据（仅首次），并显示信息
         window.onload = function() {
-            try {
-                // 如果还没有任何测试键，则自动写入一次（通常发生在第一个打开页面的账号）
-                if (!localStorage.getItem('test_account_A') &&
-                    !sessionStorage.getItem('test_account_A_session')) {
-                    const key = 'test_account_A';
-                    const value = 'account_A_data_' + Date.now();
-                    localStorage.setItem(key, value);
-                    sessionStorage.setItem(key + '_session', value + '_session');
-                    document.cookie = key + '_cookie=' + value + '_cookie; path=/; max-age=3600';
-                    showStatus('已自动写入一次测试数据（首个访问此页面的账号）', 'success');
-                } else {
-                    showStatus('读取现有数据（本次未写入新数据）', 'success');
-                }
-            } catch (e) {
-                showStatus('页面初始化失败: ' + e.message, 'danger');
-            }
+            autoInitTestData();
             readAllData();
             updatePageInfo();
         };
+
+        // 首次访问时自动写入测试数据，后续账号/会话只读取不覆盖
+        function autoInitTestData() {
+            // 如果已经存在我们的测试键，说明之前某个账号/会话写入过，直接读取即可
+            if (localStorage.getItem('test_account_A')) {
+                showStatus('检测到已有测试数据（未覆盖）', 'warning');
+                return;
+            }
+
+            // 生成一次性的标记值，用于区分首个写入者
+            const value = 'auto_' + Date.now();
+
+            try {
+                // 写入 localStorage（持久）
+                localStorage.setItem('test_account_A', value);
+
+                // 写入 sessionStorage（会话）
+                sessionStorage.setItem('test_account_A_session', value + '_session');
+
+                // 写入 Cookie（持久）
+                document.cookie = 'test_account_A_cookie=' + value + '_cookie; path=/; max-age=3600';
+
+                showStatus('首次访问：已自动写入测试数据', 'success');
+            } catch (e) {
+                showStatus('❌ 自动写入失败: ' + e.message, 'danger');
+            }
+        }
 
         function showStatus(message, type) {
             const statusDiv = document.getElementById('status');
@@ -190,6 +202,7 @@
             statusDiv.className = 'status ' + type;
         }
 
+        // 手动写入测试数据（可选，用于覆盖当前会话的值）
         function writeTestData() {
             const key = document.getElementById('testKey').value || 'test_account_A';
             const value = document.getElementById('testValue').value || 'account_A_data_' + Date.now();
