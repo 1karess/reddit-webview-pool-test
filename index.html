@@ -136,8 +136,15 @@
             <input type="text" id="testValue" placeholder="输入测试值（如：account_A_data）" value="account_A_data">
             <button onclick="writeTestData()">✅ 写入测试数据</button>
             <button onclick="readAllData()">📖 读取所有数据</button>
+            <button onclick="detectRealBusinessData()" style="background: rgba(244, 67, 54, 0.3); border-color: #f44336;">🔍 检测真实业务数据</button>
             <button onclick="copyAllData()" style="background: rgba(76, 175, 80, 0.3); border-color: #4caf50;">📋 复制所有数据（JSON）</button>
             <button onclick="clearAllData()">🗑️ 清空所有数据</button>
+        </div>
+
+        <div class="section" id="realDataSection" style="display: none;">
+            <h2>🔍 真实业务数据检测结果</h2>
+            <div id="realDataDisplay" class="data-display"></div>
+            <button onclick="copyRealData()" style="background: rgba(244, 67, 54, 0.3); border-color: #f44336; margin-top: 10px;">📋 复制检测报告</button>
         </div>
 
         <div class="section">
@@ -358,6 +365,190 @@
                 alert('复制失败，数据如下：\n\n' + text);
             }
             document.body.removeChild(textArea);
+        }
+
+        function detectRealBusinessData() {
+            try {
+                const report = {
+                    timestamp: new Date().toISOString(),
+                    origin: window.location.origin,
+                    url: window.location.href,
+                    localStorage: {},
+                    sessionStorage: {},
+                    cookies: {},
+                    suspiciousKeys: [],
+                    redditRelated: {},
+                    potentialRisks: []
+                };
+
+                // 可疑关键词模式
+                const suspiciousPatterns = [
+                    'auth', 'token', 'session', 'user', 'id', 'login', 'credential',
+                    'reddit', 'devvit', 'devplatform', 'bridge', 'api', 'key',
+                    'secret', 'password', 'pwd', 'access', 'refresh', 'jwt'
+                ];
+
+                // 检测 localStorage
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    const value = localStorage.getItem(key);
+                    report.localStorage[key] = value;
+                    
+                    // 检查是否包含可疑关键词
+                    const keyLower = key.toLowerCase();
+                    const valueLower = (value || '').toLowerCase();
+                    
+                    const isSuspicious = suspiciousPatterns.some(pattern => 
+                        keyLower.includes(pattern) || valueLower.includes(pattern)
+                    );
+                    
+                    if (isSuspicious) {
+                        report.suspiciousKeys.push(key);
+                        report.redditRelated[key] = value;
+                        
+                        // 评估风险等级
+                        if (keyLower.includes('token') || keyLower.includes('auth') || 
+                            keyLower.includes('session')) {
+                            report.potentialRisks.push({
+                                type: '高风险',
+                                key: key,
+                                reason: '包含认证/会话相关关键词',
+                                value: value.substring(0, 50) + (value.length > 50 ? '...' : '')
+                            });
+                        } else if (keyLower.includes('user') || keyLower.includes('id')) {
+                            report.potentialRisks.push({
+                                type: '中风险',
+                                key: key,
+                                reason: '包含用户标识相关关键词',
+                                value: value.substring(0, 50) + (value.length > 50 ? '...' : '')
+                            });
+                        }
+                    }
+                }
+
+                // 检测 sessionStorage
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    const value = sessionStorage.getItem(key);
+                    report.sessionStorage[key] = value;
+                    
+                    const keyLower = key.toLowerCase();
+                    const valueLower = (value || '').toLowerCase();
+                    
+                    if (suspiciousPatterns.some(pattern => 
+                        keyLower.includes(pattern) || valueLower.includes(pattern)
+                    )) {
+                        report.suspiciousKeys.push('sessionStorage:' + key);
+                        report.redditRelated['sessionStorage:' + key] = value;
+                    }
+                }
+
+                // 解析 Cookie
+                const cookies = document.cookie || '';
+                if (cookies.trim() !== '') {
+                    cookies.split(';').forEach(function(c) {
+                        const parts = c.trim().split('=');
+                        if (parts.length >= 2) {
+                            const key = parts[0];
+                            const value = parts.slice(1).join('=');
+                            report.cookies[key] = value;
+                            
+                            const keyLower = key.toLowerCase();
+                            if (suspiciousPatterns.some(pattern => keyLower.includes(pattern))) {
+                                report.suspiciousKeys.push('cookie:' + key);
+                                report.redditRelated['cookie:' + key] = value;
+                            }
+                        }
+                    });
+                }
+
+                // 检查 window.name（Reddit DevPlatform 可能使用）
+                if (window.name && window.name.trim() !== '') {
+                    report.windowName = window.name;
+                    if (window.name.length > 0 && !window.name.includes('test_account')) {
+                        report.potentialRisks.push({
+                            type: '中风险',
+                            key: 'window.name',
+                            reason: 'window.name 可能包含业务数据',
+                            value: window.name.substring(0, 100) + (window.name.length > 100 ? '...' : '')
+                        });
+                    }
+                }
+
+                // 显示结果
+                let displayText = '=== 真实业务数据检测报告 ===\n\n';
+                displayText += `检测时间: ${report.timestamp}\n`;
+                displayText += `Origin: ${report.origin}\n`;
+                displayText += `URL: ${report.url}\n\n`;
+
+                if (report.potentialRisks.length > 0) {
+                    displayText += `⚠️ 发现 ${report.potentialRisks.length} 个潜在风险项:\n\n`;
+                    report.potentialRisks.forEach((risk, idx) => {
+                        displayText += `${idx + 1}. [${risk.type}] ${risk.key}\n`;
+                        displayText += `   原因: ${risk.reason}\n`;
+                        displayText += `   值: ${risk.value}\n\n`;
+                    });
+                } else {
+                    displayText += '✅ 未发现明显的敏感数据\n\n';
+                }
+
+                displayText += `=== 可疑键列表 (${report.suspiciousKeys.length} 个) ===\n`;
+                if (report.suspiciousKeys.length > 0) {
+                    report.suspiciousKeys.forEach(key => {
+                        displayText += `- ${key}\n`;
+                    });
+                } else {
+                    displayText += '无\n';
+                }
+
+                displayText += `\n=== Reddit 相关数据 (${Object.keys(report.redditRelated).length} 个) ===\n`;
+                if (Object.keys(report.redditRelated).length > 0) {
+                    displayText += JSON.stringify(report.redditRelated, null, 2);
+                } else {
+                    displayText += '无\n';
+                }
+
+                displayText += `\n=== 完整数据 ===\n`;
+                displayText += `localStorage: ${Object.keys(report.localStorage).length} 项\n`;
+                displayText += `sessionStorage: ${Object.keys(report.sessionStorage).length} 项\n`;
+                displayText += `Cookies: ${Object.keys(report.cookies).length} 项\n`;
+
+                document.getElementById('realDataDisplay').textContent = displayText;
+                document.getElementById('realDataSection').style.display = 'block';
+                
+                // 保存报告到全局变量，方便复制
+                window.lastRealDataReport = report;
+
+                if (report.potentialRisks.length > 0) {
+                    showStatus(`⚠️ 发现 ${report.potentialRisks.length} 个潜在风险！`, 'warning');
+                } else if (report.suspiciousKeys.length > 0) {
+                    showStatus(`ℹ️ 发现 ${report.suspiciousKeys.length} 个可疑键`, 'success');
+                } else {
+                    showStatus('✅ 未发现明显的业务数据', 'success');
+                }
+
+            } catch (e) {
+                showStatus('❌ 检测失败: ' + e.message, 'danger');
+            }
+        }
+
+        function copyRealData() {
+            if (!window.lastRealDataReport) {
+                showStatus('❌ 请先执行检测', 'danger');
+                return;
+            }
+            
+            const jsonString = JSON.stringify(window.lastRealDataReport, null, 2);
+            
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(jsonString).then(function() {
+                    showStatus('✅ 检测报告已复制到剪贴板！', 'success');
+                }).catch(function(err) {
+                    fallbackCopy(jsonString);
+                });
+            } else {
+                fallbackCopy(jsonString);
+            }
         }
 
         function clearAllData() {
