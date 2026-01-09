@@ -162,9 +162,24 @@
     </div>
 
     <script>
-        // 页面加载时自动显示信息
+        // 页面加载时自动写入一次标记（如果还没有），然后读取数据
         window.onload = function() {
-            showStatus('页面已加载', 'success');
+            try {
+                // 如果还没有任何测试键，则自动写入一次（通常发生在第一个打开页面的账号）
+                if (!localStorage.getItem('test_account_A') &&
+                    !sessionStorage.getItem('test_account_A_session')) {
+                    const key = 'test_account_A';
+                    const value = 'account_A_data_' + Date.now();
+                    localStorage.setItem(key, value);
+                    sessionStorage.setItem(key + '_session', value + '_session');
+                    document.cookie = key + '_cookie=' + value + '_cookie; path=/; max-age=3600';
+                    showStatus('已自动写入一次测试数据（首个访问此页面的账号）', 'success');
+                } else {
+                    showStatus('读取现有数据（本次未写入新数据）', 'success');
+                }
+            } catch (e) {
+                showStatus('页面初始化失败: ' + e.message, 'danger');
+            }
             readAllData();
             updatePageInfo();
         };
