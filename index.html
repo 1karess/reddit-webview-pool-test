@@ -475,6 +475,44 @@
                     }
                 }
 
+                // 检测 IndexedDB（Reddit 可能使用）
+                report.indexedDB = {};
+                if ('indexedDB' in window) {
+                    try {
+                        // 尝试列出所有数据库
+                        if (indexedDB.databases) {
+                            indexedDB.databases().then(databases => {
+                                report.indexedDB.databases = databases.map(db => ({
+                                    name: db.name,
+                                    version: db.version
+                                }));
+                                
+                                // 检查每个数据库
+                                databases.forEach(db => {
+                                    const request = indexedDB.open(db.name);
+                                    request.onsuccess = function(event) {
+                                        const db_obj = event.target.result;
+                                        if (db_obj.objectStoreNames.length > 0) {
+                                            report.indexedDB[db.name] = {
+                                                objectStores: Array.from(db_obj.objectStoreNames),
+                                                note: '发现对象存储，可能包含数据'
+                                            };
+                                        }
+                                    };
+                                });
+                            }).catch(e => {
+                                report.indexedDB.error = '无法访问数据库列表: ' + e.message;
+                            });
+                        } else {
+                            report.indexedDB.note = '浏览器不支持 indexedDB.databases()，无法自动检测';
+                        }
+                    } catch (e) {
+                        report.indexedDB.error = '检测 IndexedDB 时出错: ' + e.message;
+                    }
+                } else {
+                    report.indexedDB.note = '浏览器不支持 IndexedDB';
+                }
+
                 // 显示结果
                 let displayText = '=== 真实业务数据检测报告 ===\n\n';
                 displayText += `检测时间: ${report.timestamp}\n`;
@@ -512,6 +550,32 @@
                 displayText += `localStorage: ${Object.keys(report.localStorage).length} 项\n`;
                 displayText += `sessionStorage: ${Object.keys(report.sessionStorage).length} 项\n`;
                 displayText += `Cookies: ${Object.keys(report.cookies).length} 项\n`;
+                
+                if (report.indexedDB) {
+                    displayText += `\n=== IndexedDB ===\n`;
+                    if (report.indexedDB.databases && report.indexedDB.databases.length > 0) {
+                        displayText += `发现 ${report.indexedDB.databases.length} 个数据库:\n`;
+                        report.indexedDB.databases.forEach(db => {
+                            displayText += `- ${db.name} (版本: ${db.version})\n`;
+                        });
+                    } else if (report.indexedDB.note) {
+                        displayText += report.indexedDB.note + '\n';
+                    } else {
+                        displayText += '未发现 IndexedDB 数据库\n';
+                    }
+                }
+                
+                // 重要提示
+                if (Object.keys(report.localStorage).length === 0 && 
+                    Object.keys(report.sessionStorage).length === 0 && 
+                    Object.keys(report.cookies).length === 0) {
+                    displayText += `\n⚠️ 重要发现：当前 origin 下未发现任何存储数据\n`;
+                    displayText += `这可能说明：\n`;
+                    displayText += `1. Reddit 没有在这个 origin 下存储敏感数据\n`;
+                    displayText += `2. 数据可能存储在其他 origin（如 reddit.com、devvit.reddit.com）\n`;
+                    displayText += `3. 数据可能使用其他存储方式（IndexedDB、Native 层等）\n`;
+                    displayText += `4. 数据可能通过 bridge 传递但不持久化\n`;
+                }
 
                 document.getElementById('realDataDisplay').textContent = displayText;
                 document.getElementById('realDataSection').style.display = 'block';
