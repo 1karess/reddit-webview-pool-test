@@ -179,6 +179,16 @@
 
         // 首次访问时自动写入测试数据，后续账号/会话只读取不覆盖
         function autoInitTestData() {
+            // 测试 window.name 是否会在账号切换后残留
+            if (!window.name || window.name.trim() === '' || window.name === 'test_window_name_A') {
+                // 首次访问，设置测试用的 window.name
+                window.name = 'test_window_name_A_' + Date.now();
+                showStatus('已设置测试 window.name', 'success');
+            } else if (window.name.startsWith('test_window_name_A')) {
+                // 检测到之前设置的 window.name，说明跨账号残留了
+                showStatus('⚠️ 检测到 window.name 残留！', 'warning');
+            }
+            
             // 如果已经存在我们的测试键，说明之前某个账号/会话写入过，直接读取即可
             if (localStorage.getItem('test_account_A')) {
                 showStatus('检测到已有测试数据（未覆盖）', 'warning');
@@ -647,10 +657,16 @@
                 displayText += `长度: ${window.name.length} 字符\n\n`;
                 displayText += `原始内容（前500字符）:\n${window.name.substring(0, 500)}${window.name.length > 500 ? '...' : ''}\n\n`;
                 
+                // 检查是否是我们的测试数据
+                if (window.name.startsWith('test_window_name_A')) {
+                    displayText += `⚠️ 这是测试数据（test_window_name_A）\n`;
+                    displayText += `如果这是账号 B 的检测，说明 window.name 跨账号残留了！\n\n`;
+                }
+                
                 // 尝试解析为 JSON
                 try {
                     const bridgeContext = JSON.parse(window.name);
-                    displayText += `✅ 成功解析为 JSON\n\n`;
+                    displayText += `✅ 成功解析为 JSON（可能是 Reddit 的 bridgeContext）\n\n`;
                     displayText += `解析后的 bridgeContext:\n${JSON.stringify(bridgeContext, null, 2)}\n\n`;
                     
                     displayText += `⚠️ 敏感字段检查:\n`;
@@ -668,15 +684,20 @@
                         }
                     });
                 } catch (e) {
-                    displayText += `❌ 不是有效的 JSON: ${e.message}\n`;
-                    displayText += `可能是普通字符串\n`;
+                    displayText += `ℹ️ 不是有效的 JSON: ${e.message}\n`;
+                    displayText += `可能是普通字符串或测试数据\n`;
                 }
             } else {
                 displayText += `❌ window.name 为空或未设置\n\n`;
                 displayText += `说明：\n`;
                 displayText += `- 如果这是 Reddit 的 DevPlatform 页面，应该会有 bridgeContext\n`;
                 displayText += `- 如果这是普通测试页面，window.name 为空是正常的\n`;
-                displayText += `- 需要在 Reddit App 的真实 DevPlatform 页面中检测才能看到 bridgeContext\n`;
+                displayText += `- 我们的测试页面会在首次访问时自动设置测试用的 window.name\n`;
+                displayText += `- 如果账号 B 能看到账号 A 设置的测试 window.name，说明存在跨账号残留风险\n\n`;
+                displayText += `测试方法：\n`;
+                displayText += `1. 账号 A 打开此页面，会自动设置 test_window_name_A\n`;
+                displayText += `2. 切换到账号 B，再次打开此页面\n`;
+                displayText += `3. 如果账号 B 能看到 test_window_name_A，说明 window.name 跨账号残留了\n`;
             }
             
             windowNameDisplay.textContent = displayText;
