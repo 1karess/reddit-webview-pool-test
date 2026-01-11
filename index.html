@@ -462,16 +462,40 @@
                     });
                 }
 
-                // 检查 window.name（Reddit DevPlatform 可能使用）
+                // 检查 window.name（Reddit DevPlatform 使用 bridgeContext）
                 if (window.name && window.name.trim() !== '') {
                     report.windowName = window.name;
-                    if (window.name.length > 0 && !window.name.includes('test_account')) {
-                        report.potentialRisks.push({
-                            type: '中风险',
-                            key: 'window.name',
-                            reason: 'window.name 可能包含业务数据',
-                            value: window.name.substring(0, 100) + (window.name.length > 100 ? '...' : '')
+                    
+                    // 尝试解析为 JSON（Reddit 的 bridgeContext 是 JSON）
+                    let bridgeContext = null;
+                    try {
+                        bridgeContext = JSON.parse(window.name);
+                        report.bridgeContext = bridgeContext;
+                        
+                        // 检查 bridgeContext 中的敏感字段
+                        const sensitiveFields = ['webbitToken', 'signedRequestContext', 'postData', 'webViewContext', 'webViewClientData'];
+                        sensitiveFields.forEach(field => {
+                            if (bridgeContext[field]) {
+                                report.potentialRisks.push({
+                                    type: '高风险',
+                                    key: 'window.name.bridgeContext.' + field,
+                                    reason: 'bridgeContext 包含 ' + field + '，可能包含用户/会话信息',
+                                    value: typeof bridgeContext[field] === 'string' 
+                                        ? bridgeContext[field].substring(0, 100) + (bridgeContext[field].length > 100 ? '...' : '')
+                                        : JSON.stringify(bridgeContext[field]).substring(0, 100)
+                                });
+                            }
                         });
+                    } catch (e) {
+                        // 不是 JSON，可能是普通字符串
+                        if (window.name.length > 0 && !window.name.includes('test_account')) {
+                            report.potentialRisks.push({
+                                type: '中风险',
+                                key: 'window.name',
+                                reason: 'window.name 包含数据（非 JSON）',
+                                value: window.name.substring(0, 100) + (window.name.length > 100 ? '...' : '')
+                            });
+                        }
                     }
                 }
 
@@ -546,6 +570,21 @@
                     displayText += '无\n';
                 }
 
+                if (report.windowName) {
+                    displayText += `\n=== window.name (bridgeContext) ===\n`;
+                    displayText += `内容: ${report.windowName.substring(0, 200)}${report.windowName.length > 200 ? '...' : ''}\n`;
+                    if (report.bridgeContext) {
+                        displayText += `\n解析后的 bridgeContext:\n`;
+                        displayText += JSON.stringify(report.bridgeContext, null, 2) + '\n';
+                        displayText += `\n⚠️ bridgeContext 可能包含:\n`;
+                        displayText += `- webbitToken: ${report.bridgeContext.webbitToken ? '是' : '否'}\n`;
+                        displayText += `- signedRequestContext: ${report.bridgeContext.signedRequestContext ? '是' : '否'}\n`;
+                        displayText += `- postData: ${report.bridgeContext.postData ? '是' : '否'}\n`;
+                        displayText += `- webViewContext: ${report.bridgeContext.webViewContext ? '是' : '否'}\n`;
+                        displayText += `- webViewClientData: ${report.bridgeContext.webViewClientData ? '是' : '否'}\n`;
+                    }
+                }
+                
                 displayText += `\n=== 完整数据 ===\n`;
                 displayText += `localStorage: ${Object.keys(report.localStorage).length} 项\n`;
                 displayText += `sessionStorage: ${Object.keys(report.sessionStorage).length} 项\n`;
