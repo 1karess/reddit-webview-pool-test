@@ -1,761 +1,172 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebView Pool 风险测试页面</title>
+    <title>Reddit WebView 数据读取测试</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #fff;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 24px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-        .section {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .section h2 {
-            font-size: 18px;
-            margin-bottom: 15px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 10px;
-        }
-        button {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            color: #fff;
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-size: 16px;
-            cursor: pointer;
-            margin: 5px;
-            transition: all 0.3s;
-            width: 100%;
-            margin-bottom: 10px;
-        }
-        button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-        button:active {
-            transform: translateY(0);
-        }
-        .data-display {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            max-height: 200px;
-            overflow-y: auto;
-            word-break: break-all;
-        }
-        .status {
-            text-align: center;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-        .status.success {
-            background: rgba(76, 175, 80, 0.3);
-            border: 2px solid #4caf50;
-        }
-        .status.warning {
-            background: rgba(255, 152, 0, 0.3);
-            border: 2px solid #ff9800;
-        }
-        .status.danger {
-            background: rgba(244, 67, 54, 0.3);
-            border: 2px solid #f44336;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-        input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-        .info {
-            background: rgba(33, 150, 243, 0.3);
-            border: 2px solid #2196f3;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
+        body { font-family: monospace; padding: 20px; }
+        .section { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
+        .critical { background: #ffcccc; }
+        .key { color: blue; font-weight: bold; }
+        .value { color: green; word-break: break-all; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔍 WebView Pool 风险测试</h1>
-        
-        <div class="info">
-            <strong>测试说明：</strong><br>
-            1. 在账号 A 下，点击"写入测试数据"<br>
-            2. 关闭页面，切换到账号 B<br>
-            3. 再次打开此页面，检查是否还能看到账号 A 的数据
-        </div>
-
-        <div id="status" class="status"></div>
-
-        <div class="section">
-            <h2>📝 操作</h2>
-            <input type="text" id="testKey" placeholder="输入测试键名（如：test_account_A）" value="test_account_A">
-            <input type="text" id="testValue" placeholder="输入测试值（如：account_A_data）" value="account_A_data">
-            <button onclick="writeTestData()">✅ 写入测试数据</button>
-            <button onclick="readAllData()">📖 读取所有数据</button>
-            <button onclick="detectRealBusinessData()" style="background: rgba(244, 67, 54, 0.3); border-color: #f44336;">🔍 检测真实业务数据</button>
-            <button onclick="checkWindowName()" style="background: rgba(255, 152, 0, 0.3); border-color: #ff9800;">🔍 检查 window.name</button>
-            <button onclick="copyAllData()" style="background: rgba(76, 175, 80, 0.3); border-color: #4caf50;">📋 复制所有数据（JSON）</button>
-            <button onclick="clearAllData()">🗑️ 清空所有数据</button>
-        </div>
-
-        <div class="section" id="realDataSection" style="display: none;">
-            <h2>🔍 真实业务数据检测结果</h2>
-            <div id="realDataDisplay" class="data-display"></div>
-            <button onclick="copyRealData()" style="background: rgba(244, 67, 54, 0.3); border-color: #f44336; margin-top: 10px;">📋 复制检测报告</button>
-        </div>
-
-        <div class="section">
-            <h2>💾 localStorage 数据</h2>
-            <div id="localStorageData" class="data-display">点击"读取所有数据"查看</div>
-        </div>
-
-        <div class="section">
-            <h2>📦 sessionStorage 数据</h2>
-            <div id="sessionStorageData" class="data-display">点击"读取所有数据"查看</div>
-        </div>
-
-        <div class="section">
-            <h2>🍪 Cookie 数据</h2>
-            <div id="cookieData" class="data-display">点击"读取所有数据"查看</div>
-        </div>
-
-        <div class="section">
-            <h2>ℹ️ 页面信息</h2>
-            <div id="pageInfo" class="data-display"></div>
-        </div>
-    </div>
-
+    <h2>Reddit WebView 敏感数据检测</h2>
+    <div id="results"></div>
+    
     <script>
-        // 页面加载时自动写入一次测试数据（仅首次），并显示信息
-        window.onload = function() {
-            autoInitTestData();
-            readAllData();
-            updatePageInfo();
-        };
-
-        // 首次访问时自动写入测试数据，后续账号/会话只读取不覆盖
-        function autoInitTestData() {
-            // 测试 window.name 是否会在账号切换后残留
-            if (!window.name || window.name.trim() === '' || window.name === 'test_window_name_A') {
-                // 首次访问，设置测试用的 window.name
-                window.name = 'test_window_name_A_' + Date.now();
-                showStatus('已设置测试 window.name', 'success');
-            } else if (window.name.startsWith('test_window_name_A')) {
-                // 检测到之前设置的 window.name，说明跨账号残留了
-                showStatus('⚠️ 检测到 window.name 残留！', 'warning');
-            }
-            
-            // 如果已经存在我们的测试键，说明之前某个账号/会话写入过，直接读取即可
-            if (localStorage.getItem('test_account_A')) {
-                showStatus('检测到已有测试数据（未覆盖）', 'warning');
-                return;
-            }
-
-            // 生成一次性的标记值，用于区分首个写入者
-            const value = 'auto_' + Date.now();
-
-            try {
-                // 写入 localStorage（持久）
-                localStorage.setItem('test_account_A', value);
-
-                // 写入 sessionStorage（会话）
-                sessionStorage.setItem('test_account_A_session', value + '_session');
-
-                // 写入 Cookie（持久）
-                document.cookie = 'test_account_A_cookie=' + value + '_cookie; path=/; max-age=3600';
-
-                showStatus('首次访问：已自动写入测试数据', 'success');
-            } catch (e) {
-                showStatus('❌ 自动写入失败: ' + e.message, 'danger');
-            }
+    const output = [];
+    
+    function addSection(title, content, critical = false) {
+        const className = critical ? 'section critical' : 'section';
+        output.push(`<div class="${className}"><h3>${title}</h3>${content}</div>`);
+    }
+    
+    // 1. 所有 Cookies（最重要！）
+    let cookieContent = '';
+    const cookies = document.cookie.split(';');
+    cookies.forEach(cookie => {
+        const [key, value] = cookie.trim().split('=');
+        const isSensitive = /token|auth|session|reddit|bearer|access/i.test(key);
+        cookieContent += `<div class="${isSensitive ? 'critical' : ''}">
+            <span class="key">${key}:</span> 
+            <span class="value">${value || '(empty)'}</span>
+        </div>`;
+    });
+    addSection('🔴 Cookies (Authentication Tokens)', cookieContent || '无 cookies', true);
+    
+    // 2. LocalStorage - 查找敏感键
+    let localContent = '';
+    const sensitivePatterns = /token|auth|user|session|reddit|bearer|access|refresh|jwt/i;
+    
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        const isSensitive = sensitivePatterns.test(key) || sensitivePatterns.test(value);
+        
+        localContent += `<div class="${isSensitive ? 'critical' : ''}">
+            <span class="key">${key}:</span><br>
+            <span class="value">${value?.substring(0, 500)}${value?.length > 500 ? '...' : ''}</span>
+        </div>`;
+    }
+    addSection('🟡 LocalStorage', localContent || '无数据', false);
+    
+    // 3. SessionStorage
+    let sessionContent = '';
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        const value = sessionStorage.getItem(key);
+        const isSensitive = sensitivePatterns.test(key);
+        
+        sessionContent += `<div class="${isSensitive ? 'critical' : ''}">
+            <span class="key">${key}:</span><br>
+            <span class="value">${value?.substring(0, 500)}</span>
+        </div>`;
+    }
+    addSection('🟡 SessionStorage', sessionContent || '无数据', false);
+    
+    // 4. IndexedDB 数据库列表
+    indexedDB.databases().then(dbs => {
+        let dbContent = `发现 ${dbs.length} 个数据库:<br>`;
+        dbs.forEach(db => {
+            dbContent += `<div>- <span class="key">${db.name}</span> (版本 ${db.version})</div>`;
+        });
+        addSection('🟠 IndexedDB', dbContent, dbs.length > 0);
+        updateDisplay();
+    }).catch(e => {
+        addSection('🟠 IndexedDB', `无法访问: ${e.message}`, false);
+        updateDisplay();
+    });
+    
+    // 5. 检查特定的 Reddit API endpoints 可访问性
+    const apiTests = [
+        'https://oauth.reddit.com/api/v1/me',
+        'https://www.reddit.com/api/me.json'
+    ];
+    
+    let apiContent = '正在测试 API 访问...<br>';
+    addSection('🔴 Reddit API 访问测试', apiContent, true);
+    
+    // 6. 尝试读取 Cache Storage
+    if ('caches' in window) {
+        caches.keys().then(cacheNames => {
+            let cacheContent = `发现 ${cacheNames.length} 个缓存:<br>`;
+            cacheNames.forEach(name => {
+                cacheContent += `<div>- <span class="key">${name}</span></div>`;
+            });
+            addSection('🟠 Cache Storage', cacheContent, cacheNames.length > 0);
+            updateDisplay();
+        });
+    }
+    
+    // 7. 检查可能的 Reddit token 格式
+    function findTokens() {
+        let findings = '';
+        const allData = [];
+        
+        // 收集所有数据
+        for (let i = 0; i < localStorage.length; i++) {
+            allData.push(localStorage.getItem(localStorage.key(i)));
         }
-
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = message;
-            statusDiv.className = 'status ' + type;
-        }
-
-        // 手动写入测试数据（可选，用于覆盖当前会话的值）
-        function writeTestData() {
-            const key = document.getElementById('testKey').value || 'test_account_A';
-            const value = document.getElementById('testValue').value || 'account_A_data_' + Date.now();
-            
-            try {
-                // 写入 localStorage
-                localStorage.setItem(key, value);
+        allData.push(document.cookie);
+        
+        // 查找 JWT tokens (格式: xxx.yyy.zzz)
+        const jwtPattern = /eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+        
+        // 查找可能的 Reddit tokens
+        const redditPattern = /[0-9]+-[A-Za-z0-9_-]{20,}/g;
+        
+        allData.forEach(data => {
+            if (data) {
+                const jwtMatches = data.match(jwtPattern);
+                const redditMatches = data.match(redditPattern);
                 
-                // 写入 sessionStorage
-                sessionStorage.setItem(key + '_session', value + '_session');
-                
-                // 写入 Cookie
-                document.cookie = key + '_cookie=' + value + '_cookie; path=/; max-age=3600';
-                
-                showStatus('✅ 数据写入成功！键: ' + key, 'success');
-                readAllData();
-            } catch (e) {
-                showStatus('❌ 写入失败: ' + e.message, 'danger');
-            }
-        }
-
-        function readAllData() {
-            // 读取 localStorage
-            let lsData = {};
-            try {
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    lsData[key] = localStorage.getItem(key);
+                if (jwtMatches) {
+                    findings += '<div class="critical">🔴 发现 JWT Token:<br>' + 
+                               `<span class="value">${jwtMatches[0]}</span></div>`;
                 }
-            } catch (e) {
-                lsData = {error: e.message};
-            }
-            document.getElementById('localStorageData').textContent = 
-                Object.keys(lsData).length > 0 
-                    ? JSON.stringify(lsData, null, 2)
-                    : '（空）';
-
-            // 读取 sessionStorage
-            let ssData = {};
-            try {
-                for (let i = 0; i < sessionStorage.length; i++) {
-                    const key = sessionStorage.key(i);
-                    ssData[key] = sessionStorage.getItem(key);
+                if (redditMatches) {
+                    findings += '<div class="critical">🔴 发现疑似 Reddit Token:<br>' + 
+                               `<span class="value">${redditMatches[0]}</span></div>`;
                 }
-            } catch (e) {
-                ssData = {error: e.message};
             }
-            document.getElementById('sessionStorageData').textContent = 
-                Object.keys(ssData).length > 0 
-                    ? JSON.stringify(ssData, null, 2)
-                    : '（空）';
-
-            // 读取 Cookie
-            const cookies = document.cookie || '（空）';
-            document.getElementById('cookieData').textContent = cookies;
-
-            // 检查是否有残留数据
-            if (Object.keys(lsData).length > 0 || Object.keys(ssData).length > 0 || cookies !== '（空）') {
-                showStatus('⚠️ 检测到数据！可能是跨账号残留', 'warning');
+        });
+        
+        return findings || '未发现明显的 token 格式';
+    }
+    
+    addSection('🔴 Token 模式匹配', findTokens(), true);
+    
+    // 8. 测试能否发起认证请求
+    async function testAuthenticatedRequest() {
+        try {
+            const response = await fetch('https://oauth.reddit.com/api/v1/me', {
+                credentials: 'include' // 自动带上 cookies
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                return `<div class="critical">⚠️ 成功访问用户信息！<br>
+                        用户名: ${data.name}<br>
+                        ID: ${data.id}</div>`;
             } else {
-                showStatus('✅ 未检测到数据', 'success');
+                return `HTTP ${response.status} - ${response.statusText}`;
             }
+        } catch (e) {
+            return `请求失败: ${e.message}`;
         }
-
-        function copyAllData() {
-            try {
-                // 读取所有数据
-                let lsData = {};
-                try {
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        lsData[key] = localStorage.getItem(key);
-                    }
-                } catch (e) {
-                    lsData = {error: e.message};
-                }
-
-                let ssData = {};
-                try {
-                    for (let i = 0; i < sessionStorage.length; i++) {
-                        const key = sessionStorage.key(i);
-                        ssData[key] = sessionStorage.getItem(key);
-                    }
-                } catch (e) {
-                    ssData = {error: e.message};
-                }
-
-                // 解析 Cookie
-                const cookies = document.cookie || '';
-                let cookieObj = {};
-                if (cookies.trim() !== '') {
-                    cookies.split(';').forEach(function(c) {
-                        const parts = c.trim().split('=');
-                        if (parts.length >= 2) {
-                            cookieObj[parts[0]] = parts.slice(1).join('=');
-                        }
-                    });
-                }
-
-                // 页面信息
-                const pageInfo = {
-                    'URL': window.location.href,
-                    'Origin': window.location.origin,
-                    'User Agent': navigator.userAgent,
-                    '时间戳': new Date().toISOString()
-                };
-
-                // 组合所有数据
-                const allData = {
-                    '测试时间': new Date().toISOString(),
-                    '页面信息': pageInfo,
-                    'localStorage': Object.keys(lsData).length > 0 ? lsData : '（空）',
-                    'sessionStorage': Object.keys(ssData).length > 0 ? ssData : '（空）',
-                    'Cookie': Object.keys(cookieObj).length > 0 ? cookieObj : '（空）',
-                    'Cookie原始字符串': cookies || '（空）'
-                };
-
-                // 格式化为 JSON
-                const jsonString = JSON.stringify(allData, null, 2);
-
-                // 复制到剪贴板
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(jsonString).then(function() {
-                        showStatus('✅ 所有数据已复制到剪贴板！', 'success');
-                    }).catch(function(err) {
-                        // 降级方案：使用传统方法
-                        fallbackCopy(jsonString);
-                    });
-                } else {
-                    // 降级方案：使用传统方法
-                    fallbackCopy(jsonString);
-                }
-            } catch (e) {
-                showStatus('❌ 复制失败: ' + e.message, 'danger');
-            }
-        }
-
-        function fallbackCopy(text) {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                showStatus('✅ 所有数据已复制到剪贴板！', 'success');
-            } catch (err) {
-                showStatus('❌ 复制失败，请手动复制', 'danger');
-                // 如果复制失败，至少显示数据让用户手动复制
-                alert('复制失败，数据如下：\n\n' + text);
-            }
-            document.body.removeChild(textArea);
-        }
-
-        function detectRealBusinessData() {
-            try {
-                const report = {
-                    timestamp: new Date().toISOString(),
-                    origin: window.location.origin,
-                    url: window.location.href,
-                    localStorage: {},
-                    sessionStorage: {},
-                    cookies: {},
-                    suspiciousKeys: [],
-                    redditRelated: {},
-                    potentialRisks: []
-                };
-
-                // 可疑关键词模式
-                const suspiciousPatterns = [
-                    'auth', 'token', 'session', 'user', 'id', 'login', 'credential',
-                    'reddit', 'devvit', 'devplatform', 'bridge', 'api', 'key',
-                    'secret', 'password', 'pwd', 'access', 'refresh', 'jwt'
-                ];
-
-                // 检测 localStorage
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    const value = localStorage.getItem(key);
-                    report.localStorage[key] = value;
-                    
-                    // 检查是否包含可疑关键词
-                    const keyLower = key.toLowerCase();
-                    const valueLower = (value || '').toLowerCase();
-                    
-                    const isSuspicious = suspiciousPatterns.some(pattern => 
-                        keyLower.includes(pattern) || valueLower.includes(pattern)
-                    );
-                    
-                    if (isSuspicious) {
-                        report.suspiciousKeys.push(key);
-                        report.redditRelated[key] = value;
-                        
-                        // 评估风险等级
-                        if (keyLower.includes('token') || keyLower.includes('auth') || 
-                            keyLower.includes('session')) {
-                            report.potentialRisks.push({
-                                type: '高风险',
-                                key: key,
-                                reason: '包含认证/会话相关关键词',
-                                value: value.substring(0, 50) + (value.length > 50 ? '...' : '')
-                            });
-                        } else if (keyLower.includes('user') || keyLower.includes('id')) {
-                            report.potentialRisks.push({
-                                type: '中风险',
-                                key: key,
-                                reason: '包含用户标识相关关键词',
-                                value: value.substring(0, 50) + (value.length > 50 ? '...' : '')
-                            });
-                        }
-                    }
-                }
-
-                // 检测 sessionStorage
-                for (let i = 0; i < sessionStorage.length; i++) {
-                    const key = sessionStorage.key(i);
-                    const value = sessionStorage.getItem(key);
-                    report.sessionStorage[key] = value;
-                    
-                    const keyLower = key.toLowerCase();
-                    const valueLower = (value || '').toLowerCase();
-                    
-                    if (suspiciousPatterns.some(pattern => 
-                        keyLower.includes(pattern) || valueLower.includes(pattern)
-                    )) {
-                        report.suspiciousKeys.push('sessionStorage:' + key);
-                        report.redditRelated['sessionStorage:' + key] = value;
-                    }
-                }
-
-                // 解析 Cookie
-                const cookies = document.cookie || '';
-                if (cookies.trim() !== '') {
-                    cookies.split(';').forEach(function(c) {
-                        const parts = c.trim().split('=');
-                        if (parts.length >= 2) {
-                            const key = parts[0];
-                            const value = parts.slice(1).join('=');
-                            report.cookies[key] = value;
-                            
-                            const keyLower = key.toLowerCase();
-                            if (suspiciousPatterns.some(pattern => keyLower.includes(pattern))) {
-                                report.suspiciousKeys.push('cookie:' + key);
-                                report.redditRelated['cookie:' + key] = value;
-                            }
-                        }
-                    });
-                }
-
-                // 检查 window.name（Reddit DevPlatform 使用 bridgeContext）
-                if (window.name && window.name.trim() !== '') {
-                    report.windowName = window.name;
-                    
-                    // 尝试解析为 JSON（Reddit 的 bridgeContext 是 JSON）
-                    let bridgeContext = null;
-                    try {
-                        bridgeContext = JSON.parse(window.name);
-                        report.bridgeContext = bridgeContext;
-                        
-                        // 检查 bridgeContext 中的敏感字段
-                        const sensitiveFields = ['webbitToken', 'signedRequestContext', 'postData', 'webViewContext', 'webViewClientData'];
-                        sensitiveFields.forEach(field => {
-                            if (bridgeContext[field]) {
-                                report.potentialRisks.push({
-                                    type: '高风险',
-                                    key: 'window.name.bridgeContext.' + field,
-                                    reason: 'bridgeContext 包含 ' + field + '，可能包含用户/会话信息',
-                                    value: typeof bridgeContext[field] === 'string' 
-                                        ? bridgeContext[field].substring(0, 100) + (bridgeContext[field].length > 100 ? '...' : '')
-                                        : JSON.stringify(bridgeContext[field]).substring(0, 100)
-                                });
-                            }
-                        });
-                    } catch (e) {
-                        // 不是 JSON，可能是普通字符串
-                        if (window.name.length > 0 && !window.name.includes('test_account')) {
-                            report.potentialRisks.push({
-                                type: '中风险',
-                                key: 'window.name',
-                                reason: 'window.name 包含数据（非 JSON）',
-                                value: window.name.substring(0, 100) + (window.name.length > 100 ? '...' : '')
-                            });
-                        }
-                    }
-                }
-
-                // 检测 IndexedDB（Reddit 可能使用）
-                report.indexedDB = {};
-                if ('indexedDB' in window) {
-                    try {
-                        // 尝试列出所有数据库
-                        if (indexedDB.databases) {
-                            indexedDB.databases().then(databases => {
-                                report.indexedDB.databases = databases.map(db => ({
-                                    name: db.name,
-                                    version: db.version
-                                }));
-                                
-                                // 检查每个数据库
-                                databases.forEach(db => {
-                                    const request = indexedDB.open(db.name);
-                                    request.onsuccess = function(event) {
-                                        const db_obj = event.target.result;
-                                        if (db_obj.objectStoreNames.length > 0) {
-                                            report.indexedDB[db.name] = {
-                                                objectStores: Array.from(db_obj.objectStoreNames),
-                                                note: '发现对象存储，可能包含数据'
-                                            };
-                                        }
-                                    };
-                                });
-                            }).catch(e => {
-                                report.indexedDB.error = '无法访问数据库列表: ' + e.message;
-                            });
-                        } else {
-                            report.indexedDB.note = '浏览器不支持 indexedDB.databases()，无法自动检测';
-                        }
-                    } catch (e) {
-                        report.indexedDB.error = '检测 IndexedDB 时出错: ' + e.message;
-                    }
-                } else {
-                    report.indexedDB.note = '浏览器不支持 IndexedDB';
-                }
-
-                // 显示结果
-                let displayText = '=== 真实业务数据检测报告 ===\n\n';
-                displayText += `检测时间: ${report.timestamp}\n`;
-                displayText += `Origin: ${report.origin}\n`;
-                displayText += `URL: ${report.url}\n\n`;
-
-                if (report.potentialRisks.length > 0) {
-                    displayText += `⚠️ 发现 ${report.potentialRisks.length} 个潜在风险项:\n\n`;
-                    report.potentialRisks.forEach((risk, idx) => {
-                        displayText += `${idx + 1}. [${risk.type}] ${risk.key}\n`;
-                        displayText += `   原因: ${risk.reason}\n`;
-                        displayText += `   值: ${risk.value}\n\n`;
-                    });
-                } else {
-                    displayText += '✅ 未发现明显的敏感数据\n\n';
-                }
-
-                displayText += `=== 可疑键列表 (${report.suspiciousKeys.length} 个) ===\n`;
-                if (report.suspiciousKeys.length > 0) {
-                    report.suspiciousKeys.forEach(key => {
-                        displayText += `- ${key}\n`;
-                    });
-                } else {
-                    displayText += '无\n';
-                }
-
-                displayText += `\n=== Reddit 相关数据 (${Object.keys(report.redditRelated).length} 个) ===\n`;
-                if (Object.keys(report.redditRelated).length > 0) {
-                    displayText += JSON.stringify(report.redditRelated, null, 2);
-                } else {
-                    displayText += '无\n';
-                }
-
-                if (report.windowName) {
-                    displayText += `\n=== window.name (bridgeContext) ===\n`;
-                    displayText += `内容: ${report.windowName.substring(0, 200)}${report.windowName.length > 200 ? '...' : ''}\n`;
-                    if (report.bridgeContext) {
-                        displayText += `\n解析后的 bridgeContext:\n`;
-                        displayText += JSON.stringify(report.bridgeContext, null, 2) + '\n';
-                        displayText += `\n⚠️ bridgeContext 可能包含:\n`;
-                        displayText += `- webbitToken: ${report.bridgeContext.webbitToken ? '是' : '否'}\n`;
-                        displayText += `- signedRequestContext: ${report.bridgeContext.signedRequestContext ? '是' : '否'}\n`;
-                        displayText += `- postData: ${report.bridgeContext.postData ? '是' : '否'}\n`;
-                        displayText += `- webViewContext: ${report.bridgeContext.webViewContext ? '是' : '否'}\n`;
-                        displayText += `- webViewClientData: ${report.bridgeContext.webViewClientData ? '是' : '否'}\n`;
-                    }
-                }
-                
-                displayText += `\n=== 完整数据 ===\n`;
-                displayText += `localStorage: ${Object.keys(report.localStorage).length} 项\n`;
-                displayText += `sessionStorage: ${Object.keys(report.sessionStorage).length} 项\n`;
-                displayText += `Cookies: ${Object.keys(report.cookies).length} 项\n`;
-                
-                if (report.indexedDB) {
-                    displayText += `\n=== IndexedDB ===\n`;
-                    if (report.indexedDB.databases && report.indexedDB.databases.length > 0) {
-                        displayText += `发现 ${report.indexedDB.databases.length} 个数据库:\n`;
-                        report.indexedDB.databases.forEach(db => {
-                            displayText += `- ${db.name} (版本: ${db.version})\n`;
-                        });
-                    } else if (report.indexedDB.note) {
-                        displayText += report.indexedDB.note + '\n';
-                    } else {
-                        displayText += '未发现 IndexedDB 数据库\n';
-                    }
-                }
-                
-                // 重要提示
-                if (Object.keys(report.localStorage).length === 0 && 
-                    Object.keys(report.sessionStorage).length === 0 && 
-                    Object.keys(report.cookies).length === 0) {
-                    displayText += `\n⚠️ 重要发现：当前 origin 下未发现任何存储数据\n`;
-                    displayText += `这可能说明：\n`;
-                    displayText += `1. Reddit 没有在这个 origin 下存储敏感数据\n`;
-                    displayText += `2. 数据可能存储在其他 origin（如 reddit.com、devvit.reddit.com）\n`;
-                    displayText += `3. 数据可能使用其他存储方式（IndexedDB、Native 层等）\n`;
-                    displayText += `4. 数据可能通过 bridge 传递但不持久化\n`;
-                }
-
-                document.getElementById('realDataDisplay').textContent = displayText;
-                document.getElementById('realDataSection').style.display = 'block';
-                
-                // 保存报告到全局变量，方便复制
-                window.lastRealDataReport = report;
-
-                if (report.potentialRisks.length > 0) {
-                    showStatus(`⚠️ 发现 ${report.potentialRisks.length} 个潜在风险！`, 'warning');
-                } else if (report.suspiciousKeys.length > 0) {
-                    showStatus(`ℹ️ 发现 ${report.suspiciousKeys.length} 个可疑键`, 'success');
-                } else {
-                    showStatus('✅ 未发现明显的业务数据', 'success');
-                }
-
-            } catch (e) {
-                showStatus('❌ 检测失败: ' + e.message, 'danger');
-            }
-        }
-
-        function checkWindowName() {
-            const windowNameSection = document.getElementById('realDataSection');
-            const windowNameDisplay = document.getElementById('realDataDisplay');
-            
-            let displayText = '=== window.name 检测 ===\n\n';
-            
-            if (window.name && window.name.trim() !== '') {
-                displayText += `✅ window.name 有值\n`;
-                displayText += `长度: ${window.name.length} 字符\n\n`;
-                displayText += `原始内容（前500字符）:\n${window.name.substring(0, 500)}${window.name.length > 500 ? '...' : ''}\n\n`;
-                
-                // 检查是否是我们的测试数据
-                if (window.name.startsWith('test_window_name_A')) {
-                    displayText += `⚠️ 这是测试数据（test_window_name_A）\n`;
-                    displayText += `如果这是账号 B 的检测，说明 window.name 跨账号残留了！\n\n`;
-                }
-                
-                // 尝试解析为 JSON
-                try {
-                    const bridgeContext = JSON.parse(window.name);
-                    displayText += `✅ 成功解析为 JSON（可能是 Reddit 的 bridgeContext）\n\n`;
-                    displayText += `解析后的 bridgeContext:\n${JSON.stringify(bridgeContext, null, 2)}\n\n`;
-                    
-                    displayText += `⚠️ 敏感字段检查:\n`;
-                    const sensitiveFields = ['webbitToken', 'signedRequestContext', 'postData', 'webViewContext', 'webViewClientData'];
-                    sensitiveFields.forEach(field => {
-                        if (bridgeContext[field]) {
-                            displayText += `- ${field}: ✅ 存在\n`;
-                            if (typeof bridgeContext[field] === 'string') {
-                                displayText += `  值: ${bridgeContext[field].substring(0, 100)}${bridgeContext[field].length > 100 ? '...' : ''}\n`;
-                            } else {
-                                displayText += `  值: ${JSON.stringify(bridgeContext[field]).substring(0, 100)}...\n`;
-                            }
-                        } else {
-                            displayText += `- ${field}: ❌ 不存在\n`;
-                        }
-                    });
-                } catch (e) {
-                    displayText += `ℹ️ 不是有效的 JSON: ${e.message}\n`;
-                    displayText += `可能是普通字符串或测试数据\n`;
-                }
-            } else {
-                displayText += `❌ window.name 为空或未设置\n\n`;
-                displayText += `说明：\n`;
-                displayText += `- 如果这是 Reddit 的 DevPlatform 页面，应该会有 bridgeContext\n`;
-                displayText += `- 如果这是普通测试页面，window.name 为空是正常的\n`;
-                displayText += `- 我们的测试页面会在首次访问时自动设置测试用的 window.name\n`;
-                displayText += `- 如果账号 B 能看到账号 A 设置的测试 window.name，说明存在跨账号残留风险\n\n`;
-                displayText += `测试方法：\n`;
-                displayText += `1. 账号 A 打开此页面，会自动设置 test_window_name_A\n`;
-                displayText += `2. 切换到账号 B，再次打开此页面\n`;
-                displayText += `3. 如果账号 B 能看到 test_window_name_A，说明 window.name 跨账号残留了\n`;
-            }
-            
-            windowNameDisplay.textContent = displayText;
-            windowNameSection.style.display = 'block';
-            
-            showStatus('✅ window.name 检测完成', 'success');
-        }
-
-        function copyRealData() {
-            if (!window.lastRealDataReport) {
-                showStatus('❌ 请先执行检测', 'danger');
-                return;
-            }
-            
-            const jsonString = JSON.stringify(window.lastRealDataReport, null, 2);
-            
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(jsonString).then(function() {
-                    showStatus('✅ 检测报告已复制到剪贴板！', 'success');
-                }).catch(function(err) {
-                    fallbackCopy(jsonString);
-                });
-            } else {
-                fallbackCopy(jsonString);
-            }
-        }
-
-        function clearAllData() {
-            try {
-                localStorage.clear();
-                sessionStorage.clear();
-                // 清除所有 Cookie
-                document.cookie.split(";").forEach(function(c) { 
-                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-                });
-                showStatus('✅ 所有数据已清空', 'success');
-                readAllData();
-            } catch (e) {
-                showStatus('❌ 清空失败: ' + e.message, 'danger');
-            }
-        }
-
-        function updatePageInfo() {
-            const info = {
-                'URL': window.location.href,
-                'Origin': window.location.origin,
-                'User Agent': navigator.userAgent,
-                '时间戳': new Date().toISOString(),
-                'localStorage 支持': typeof(Storage) !== "undefined" ? '是' : '否',
-                'sessionStorage 支持': typeof(sessionStorage) !== "undefined" ? '是' : '否'
-            };
-            document.getElementById('pageInfo').textContent = JSON.stringify(info, null, 2);
-        }
-
-        // 定期更新数据（每5秒）
-        setInterval(function() {
-            readAllData();
-        }, 5000);
+    }
+    
+    testAuthenticatedRequest().then(result => {
+        addSection('🔴 认证 API 调用测试', result, result.includes('成功'));
+        updateDisplay();
+    });
+    
+    function updateDisplay() {
+        document.getElementById('results').innerHTML = output.join('');
+    }
+    
+    updateDisplay();
     </script>
 </body>
 </html>
