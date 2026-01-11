@@ -137,6 +137,7 @@
             <button onclick="writeTestData()">✅ 写入测试数据</button>
             <button onclick="readAllData()">📖 读取所有数据</button>
             <button onclick="detectRealBusinessData()" style="background: rgba(244, 67, 54, 0.3); border-color: #f44336;">🔍 检测真实业务数据</button>
+            <button onclick="checkWindowName()" style="background: rgba(255, 152, 0, 0.3); border-color: #ff9800;">🔍 检查 window.name</button>
             <button onclick="copyAllData()" style="background: rgba(76, 175, 80, 0.3); border-color: #4caf50;">📋 复制所有数据（JSON）</button>
             <button onclick="clearAllData()">🗑️ 清空所有数据</button>
         </div>
@@ -633,6 +634,55 @@
             } catch (e) {
                 showStatus('❌ 检测失败: ' + e.message, 'danger');
             }
+        }
+
+        function checkWindowName() {
+            const windowNameSection = document.getElementById('realDataSection');
+            const windowNameDisplay = document.getElementById('realDataDisplay');
+            
+            let displayText = '=== window.name 检测 ===\n\n';
+            
+            if (window.name && window.name.trim() !== '') {
+                displayText += `✅ window.name 有值\n`;
+                displayText += `长度: ${window.name.length} 字符\n\n`;
+                displayText += `原始内容（前500字符）:\n${window.name.substring(0, 500)}${window.name.length > 500 ? '...' : ''}\n\n`;
+                
+                // 尝试解析为 JSON
+                try {
+                    const bridgeContext = JSON.parse(window.name);
+                    displayText += `✅ 成功解析为 JSON\n\n`;
+                    displayText += `解析后的 bridgeContext:\n${JSON.stringify(bridgeContext, null, 2)}\n\n`;
+                    
+                    displayText += `⚠️ 敏感字段检查:\n`;
+                    const sensitiveFields = ['webbitToken', 'signedRequestContext', 'postData', 'webViewContext', 'webViewClientData'];
+                    sensitiveFields.forEach(field => {
+                        if (bridgeContext[field]) {
+                            displayText += `- ${field}: ✅ 存在\n`;
+                            if (typeof bridgeContext[field] === 'string') {
+                                displayText += `  值: ${bridgeContext[field].substring(0, 100)}${bridgeContext[field].length > 100 ? '...' : ''}\n`;
+                            } else {
+                                displayText += `  值: ${JSON.stringify(bridgeContext[field]).substring(0, 100)}...\n`;
+                            }
+                        } else {
+                            displayText += `- ${field}: ❌ 不存在\n`;
+                        }
+                    });
+                } catch (e) {
+                    displayText += `❌ 不是有效的 JSON: ${e.message}\n`;
+                    displayText += `可能是普通字符串\n`;
+                }
+            } else {
+                displayText += `❌ window.name 为空或未设置\n\n`;
+                displayText += `说明：\n`;
+                displayText += `- 如果这是 Reddit 的 DevPlatform 页面，应该会有 bridgeContext\n`;
+                displayText += `- 如果这是普通测试页面，window.name 为空是正常的\n`;
+                displayText += `- 需要在 Reddit App 的真实 DevPlatform 页面中检测才能看到 bridgeContext\n`;
+            }
+            
+            windowNameDisplay.textContent = displayText;
+            windowNameSection.style.display = 'block';
+            
+            showStatus('✅ window.name 检测完成', 'success');
         }
 
         function copyRealData() {
