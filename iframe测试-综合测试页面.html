@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iframe隐私泄漏风险 - 综合测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .scenario {
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .scenario h2 {
+            color: #0079d3;
+            margin-top: 0;
+        }
+        .scenario-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #0079d3;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 10px 10px 10px 0;
+            transition: background 0.3s;
+        }
+        .scenario-link:hover {
+            background: #005fa3;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.pending {
+            background: #ff9800;
+            color: white;
+        }
+        .status.completed {
+            background: #46d160;
+            color: white;
+        }
+        .description {
+            color: #666;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .warning-box {
+            background: #fff5f5;
+            border-left: 4px solid #ff4500;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #0079d3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 iframe隐私泄漏风险 - 综合测试</h1>
+        <p>测试Reddit WebView Pool在iframe嵌套场景下的隐私泄漏风险</p>
+    </div>
+
+    <div class="info-box">
+        <h3>📋 测试说明</h3>
+        <p><strong>测试目标：</strong>验证WebView Pool在iframe嵌套场景下是否会导致跨账号数据残留</p>
+        <p><strong>测试方法：</strong></p>
+        <ol>
+            <li>在Reddit App的WebView中打开各个测试页面</li>
+            <li>在账号A下执行"写入数据"操作</li>
+            <li>切换到账号B</li>
+            <li>刷新页面，检查是否能看到账号A的数据</li>
+        </ol>
+        <p><strong>预期结果：</strong>如果存在跨账号数据残留，iframe应该能看到账号A的数据</p>
+    </div>
+
+    <div class="scenario">
+        <h2>场景1：同源iframe共享存储 <span class="status pending">待测试</span></h2>
+        <p class="description">
+            <strong>测试内容：</strong>验证同源iframe是否能访问父页面的localStorage<br>
+            <strong>风险：</strong>账号A的localStorage数据可能被账号B的iframe访问
+        </p>
+        <a href="iframe测试-场景1-同源iframe共享存储.html" class="scenario-link" target="_blank">
+            🚀 开始测试场景1
+        </a>
+    </div>
+
+    <div class="scenario">
+        <h2>场景2：跨源iframe存储残留 <span class="status pending">待测试</span></h2>
+        <p class="description">
+            <strong>测试内容：</strong>验证跨源iframe的localStorage是否会在账号切换后残留<br>
+            <strong>风险：</strong>第三方iframe（如广告、分析工具）可能存储了账号A的数据，账号B切换后仍能看到
+        </p>
+        <a href="iframe测试-场景2-跨源iframe存储残留.html" class="scenario-link" target="_blank">
+            🚀 开始测试场景2
+        </a>
+    </div>
+
+    <div class="scenario">
+        <h2>场景3：window.name泄露给iframe <span class="status pending">待测试</span></h2>
+        <p class="description">
+            <strong>测试内容：</strong>验证iframe是否能访问父页面的window.name（bridgeContext）<br>
+            <strong>风险：</strong>账号A的bridgeContext（包含deviceId、userId、token等）可能泄露给iframe
+        </p>
+        <a href="iframe测试-场景3-window.name泄露.html" class="scenario-link" target="_blank">
+            🚀 开始测试场景3
+        </a>
+    </div>
+
+    <div class="scenario">
+        <h2>场景4：postMessage传递错误数据 <span class="status pending">待测试</span></h2>
+        <p class="description">
+            <strong>测试内容：</strong>验证账号切换后，父页面是否仍会发送账号A的数据给iframe<br>
+            <strong>风险：</strong>iframe可能收到账号A的数据，并用账号A的token发起请求，导致权限混乱
+        </p>
+        <a href="iframe测试-场景4-postMessage传递错误数据.html" class="scenario-link" target="_blank">
+            🚀 开始测试场景4
+        </a>
+    </div>
+
+    <div class="scenario">
+        <h2>场景5：Cookie共享跨账号认证 <span class="status pending">待测试</span></h2>
+        <p class="description">
+            <strong>测试内容：</strong>验证同源iframe是否能使用父页面的Cookie，导致跨账号认证<br>
+            <strong>风险：</strong>账号A的认证Cookie可能被账号B的iframe使用，导致越权访问
+        </p>
+        <a href="iframe测试-场景5-Cookie共享跨账号认证.html" class="scenario-link" target="_blank">
+            🚀 开始测试场景5
+        </a>
+    </div>
+
+    <div class="warning-box">
+        <h3>⚠️ 重要提示</h3>
+        <ul>
+            <li>所有测试页面需要在<strong>Reddit App的WebView</strong>中打开</li>
+            <li>测试前确保有两个不同的Reddit账号（账号A和账号B）</li>
+            <li>每个场景测试完成后，记录测试结果</li>
+            <li>如果发现跨账号数据残留，说明存在隐私泄漏风险</li>
+        </ul>
+    </div>
+
+    <div class="info-box">
+        <h3>📝 测试结果记录</h3>
+        <p>建议为每个场景创建测试结果记录：</p>
+        <ul>
+            <li>测试时间</li>
+            <li>测试账号（账号A和账号B）</li>
+            <li>测试结果（是否发现跨账号数据残留）</li>
+            <li>截图或数据证据</li>
+        </ul>
+    </div>
+</body>
+</html>

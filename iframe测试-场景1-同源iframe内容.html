@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>同源iframe内容</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #e8f4f8;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h3>🖼️ 这是同源iframe</h3>
+    <div class="info">
+        <p><strong>当前origin：</strong><span id="origin"></span></p>
+        <p><strong>localStorage数据：</strong></p>
+        <pre id="localStorageData">（空）</pre>
+    </div>
+
+    <script>
+        // 显示当前origin
+        document.getElementById('origin').textContent = window.location.origin;
+
+        // 读取localStorage
+        function readLocalStorage() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                data[key] = localStorage.getItem(key);
+            }
+            
+            const result = Object.keys(data).length > 0 
+                ? JSON.stringify(data, null, 2)
+                : '（空）';
+            
+            document.getElementById('localStorageData').textContent = result;
+            
+            // 发送给父页面
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'localStorageData',
+                    data: data
+                }, '*');
+            }
+        }
+
+        // 清空localStorage
+        function clearLocalStorage() {
+            localStorage.clear();
+            readLocalStorage();
+        }
+
+        // 监听父页面的消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'readLocalStorage') {
+                readLocalStorage();
+            } else if (event.data && event.data.action === 'clearLocalStorage') {
+                clearLocalStorage();
+            }
+        });
+
+        // 自动读取
+        readLocalStorage();
+        
+        // 定期更新（每2秒）
+        setInterval(readLocalStorage, 2000);
+    </script>
+</body>
+</html>

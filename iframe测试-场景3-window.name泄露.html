@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>场景3测试：window.name泄露给iframe</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #0079d3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005fa3;
+        }
+        .result {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #0079d3;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .warning {
+            border-left-color: #ff4500;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #46d160;
+            background: #f5fff5;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #0079d3;
+            border-radius: 4px;
+        }
+        .note {
+            background: #fff9e6;
+            padding: 15px;
+            border-left: 4px solid #ff9800;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 场景3测试：window.name泄露给iframe</h1>
+    
+    <div class="section">
+        <h2>📋 测试说明</h2>
+        <p><strong>测试目标：</strong>验证iframe是否能访问父页面的window.name（bridgeContext）</p>
+        <p><strong>测试步骤：</strong></p>
+        <ol>
+            <li>在账号A下，点击"账号A：设置window.name（模拟bridgeContext）"</li>
+            <li>查看父页面和iframe的window.name</li>
+            <li>切换到账号B</li>
+            <li>刷新页面，查看iframe是否仍能看到账号A的window.name</li>
+        </ol>
+        <div class="note">
+            <strong>⚠️ 注意：</strong>实际Reddit会通过Native层设置window.name。
+            这里我们模拟设置window.name来测试iframe是否能访问。
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🎮 操作</h2>
+        <button onclick="setAccountAWindowName()">账号A：设置window.name（模拟bridgeContext）</button>
+        <button onclick="readParentWindowName()">读取父页面window.name</button>
+        <button onclick="askIframeToReadWindowName()">读取iframe window.name</button>
+        <button onclick="clearWindowName()">清空window.name</button>
+    </div>
+
+    <div class="section">
+        <h2>📄 父页面结果</h2>
+        <div id="parentResult" class="result">点击"读取父页面window.name"查看</div>
+    </div>
+
+    <div class="section">
+        <h2>🖼️ 同源iframe</h2>
+        <iframe id="testIframe" src="iframe测试-场景3-iframe内容.html"></iframe>
+    </div>
+
+    <div class="section">
+        <h2>📊 iframe结果</h2>
+        <div id="iframeResult" class="result">点击"读取iframe window.name"查看</div>
+    </div>
+
+    <script>
+        // 账号A设置window.name（模拟Reddit的bridgeContext）
+        function setAccountAWindowName() {
+            const bridgeContext = {
+                deviceId: 'device_12345',
+                userId: 'user_account_A',
+                accountId: 'account_A',
+                webbitToken: 'token_abc123',
+                signedRequestContext: 'signed_context_xyz',
+                advertisingId: 'ad_id_789',
+                latitude: 37.7749,
+                longitude: -122.4194,
+                timestamp: new Date().toISOString()
+            };
+            
+            window.name = JSON.stringify(bridgeContext);
+            
+            document.getElementById('parentResult').textContent = 
+                '✅ 账号A的window.name已设置（模拟bridgeContext）：\n' +
+                JSON.stringify(bridgeContext, null, 2);
+            document.getElementById('parentResult').className = 'result success';
+        }
+
+        // 读取父页面window.name
+        function readParentWindowName() {
+            if (window.name && window.name.trim() !== '') {
+                try {
+                    const bridgeContext = JSON.parse(window.name);
+                    document.getElementById('parentResult').textContent = 
+                        '父页面window.name：\n' +
+                        JSON.stringify(bridgeContext, null, 2);
+                    document.getElementById('parentResult').className = 'result warning';
+                } catch (e) {
+                    document.getElementById('parentResult').textContent = 
+                        '父页面window.name（不是JSON）：\n' + window.name.substring(0, 500);
+                    document.getElementById('parentResult').className = 'result warning';
+                }
+            } else {
+                document.getElementById('parentResult').textContent = '父页面window.name：（空）';
+                document.getElementById('parentResult').className = 'result';
+            }
+        }
+
+        // 读取iframe window.name
+        function askIframeToReadWindowName() {
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({action: 'readWindowName'}, '*');
+        }
+
+        // 清空window.name
+        function clearWindowName() {
+            window.name = '';
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({action: 'clearWindowName'}, '*');
+            document.getElementById('parentResult').textContent = '✅ 已清空';
+            document.getElementById('iframeResult').textContent = '✅ 已清空';
+        }
+
+        // 监听iframe返回的数据
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'windowNameData') {
+                const windowName = event.data.windowName;
+                
+                if (windowName && windowName.trim() !== '') {
+                    try {
+                        const bridgeContext = JSON.parse(windowName);
+                        let resultText = 'iframe window.name：\n' + 
+                            JSON.stringify(bridgeContext, null, 2);
+                        
+                        // 检查是否有账号A的数据
+                        if (bridgeContext.userId === 'user_account_A') {
+                            resultText += '\n\n⚠️ 警告：iframe能看到账号A的window.name！';
+                            resultText += '\n说明：window.name泄露给iframe，存在跨账号数据残留风险！';
+                            document.getElementById('iframeResult').className = 'result warning';
+                        } else {
+                            document.getElementById('iframeResult').className = 'result warning';
+                        }
+                        
+                        document.getElementById('iframeResult').textContent = resultText;
+                    } catch (e) {
+                        document.getElementById('iframeResult').textContent = 
+                            'iframe window.name（不是JSON）：\n' + windowName.substring(0, 500);
+                        document.getElementById('iframeResult').className = 'result warning';
+                    }
+                } else {
+                    document.getElementById('iframeResult').textContent = 'iframe window.name：（空）';
+                    document.getElementById('iframeResult').className = 'result';
+                }
+            }
+        });
+
+        // 页面加载时自动读取
+        window.onload = function() {
+            readParentWindowName();
+            setTimeout(askIframeToReadWindowName, 1000); // 等待iframe加载
+        };
+    </script>
+</body>
+</html>

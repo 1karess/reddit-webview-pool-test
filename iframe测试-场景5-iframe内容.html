@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>iframe内容（Cookie测试）</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #e8f4f8;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h3>🖼️ 这是同源iframe</h3>
+    <div class="info">
+        <p><strong>当前origin：</strong><span id="origin"></span></p>
+        <p><strong>Cookie：</strong></p>
+        <pre id="cookieData">（空）</pre>
+    </div>
+
+    <script>
+        // 显示当前origin
+        document.getElementById('origin').textContent = window.location.origin;
+
+        // 读取Cookie
+        function readCookie() {
+            const cookies = document.cookie || '';
+            const cookieObj = {};
+            
+            if (cookies.trim() !== '') {
+                cookies.split(';').forEach(cookie => {
+                    const parts = cookie.trim().split('=');
+                    if (parts.length >= 2) {
+                        cookieObj[parts[0]] = parts.slice(1).join('=');
+                    }
+                });
+            }
+            
+            const result = Object.keys(cookieObj).length > 0 
+                ? JSON.stringify(cookieObj, null, 2)
+                : '（空）';
+            
+            document.getElementById('cookieData').textContent = result;
+            
+            // 发送给父页面
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'cookieData',
+                    cookies: cookies,
+                    cookieObj: cookieObj
+                }, '*');
+            }
+        }
+
+        // 发送请求（自动携带Cookie）
+        function sendRequest() {
+            // 模拟发送请求到服务器
+            // 实际场景中，这里会发送真实的HTTP请求
+            const cookies = document.cookie || '';
+            const cookieObj = {};
+            
+            if (cookies.trim() !== '') {
+                cookies.split(';').forEach(cookie => {
+                    const parts = cookie.trim().split('=');
+                    if (parts.length >= 2) {
+                        cookieObj[parts[0]] = parts.slice(1).join('=');
+                    }
+                });
+            }
+            
+            // 模拟请求结果
+            const result = {
+                url: '/api/user',
+                method: 'GET',
+                cookies: cookieObj,
+                timestamp: new Date().toISOString()
+            };
+            
+            // 检查是否使用了账号A的Cookie
+            if (cookieObj.session_id && cookieObj.session_id.includes('account_A')) {
+                result.warning = '⚠️ 警告：iframe使用了账号A的Cookie发送请求！';
+                result.risk = '服务器可能误认为是账号A的请求，导致权限混乱或越权访问！';
+            }
+            
+            // 实际场景中，这里会执行：
+            // fetch('/api/user', {
+            //     credentials: 'include'  // 自动携带Cookie
+            // }).then(response => {
+            //     // 处理响应
+            // });
+            
+            // 发送结果给父页面
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'requestResult',
+                    result: result
+                }, '*');
+            }
+        }
+
+        // 清空Cookie
+        function clearCookie() {
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            readCookie();
+        }
+
+        // 监听父页面的消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'readCookie') {
+                readCookie();
+            } else if (event.data && event.data.action === 'sendRequest') {
+                sendRequest();
+            } else if (event.data && event.data.action === 'clearCookie') {
+                clearCookie();
+            }
+        });
+
+        // 自动读取
+        readCookie();
+        
+        // 定期更新（每2秒）
+        setInterval(readCookie, 2000);
+    </script>
+</body>
+</html>

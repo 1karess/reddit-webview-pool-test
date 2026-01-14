@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>iframe内容（postMessage测试）</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #e8f4f8;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .received-data {
+            background: #fff9e6;
+            padding: 15px;
+            border-left: 4px solid #ff9800;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff5f5;
+            border-left-color: #ff4500;
+        }
+    </style>
+</head>
+<body>
+    <h3>🖼️ 第三方iframe（模拟第三方服务）</h3>
+    <div class="info">
+        <p><strong>当前origin：</strong><span id="origin"></span></p>
+        <p><strong>状态：</strong>等待接收postMessage数据...</p>
+    </div>
+
+    <div id="receivedData" class="received-data" style="display: none;">
+        <h4>📨 收到的数据：</h4>
+        <pre id="dataContent"></pre>
+    </div>
+
+    <div id="history" class="info">
+        <h4>📜 接收历史：</h4>
+        <div id="historyContent">（无）</div>
+    </div>
+
+    <script>
+        // 显示当前origin
+        document.getElementById('origin').textContent = window.location.origin;
+
+        let receivedMessages = [];
+
+        // 监听父页面的postMessage
+        window.addEventListener('message', function(event) {
+            // 验证来源（实际应用中应该验证event.origin）
+            if (event.data && event.data.type === 'userData') {
+                const userData = event.data.data;
+                receivedMessages.push({
+                    timestamp: new Date().toISOString(),
+                    data: userData
+                });
+
+                // 显示收到的数据
+                document.getElementById('receivedData').style.display = 'block';
+                document.getElementById('dataContent').textContent = 
+                    JSON.stringify(userData, null, 2);
+
+                // 检查是否有警告
+                if (userData.warning) {
+                    document.getElementById('receivedData').className = 'received-data warning';
+                    document.getElementById('dataContent').textContent += '\n\n' + userData.warning;
+                } else {
+                    document.getElementById('receivedData').className = 'received-data';
+                }
+
+                // 更新历史
+                updateHistory();
+
+                // 发送确认给父页面
+                if (window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'dataReceived',
+                        data: userData,
+                        timestamp: new Date().toISOString()
+                    }, '*');
+                }
+
+                // ⚠️ 模拟第三方服务使用收到的token发起请求
+                if (userData.token) {
+                    console.log('⚠️ 模拟：第三方服务使用token发起请求:', userData.token);
+                    // 实际场景中，这里可能会：
+                    // fetch('/api/user', {
+                    //     headers: {
+                    //         'Authorization': 'Bearer ' + userData.token
+                    //     }
+                    // });
+                }
+            } else if (event.data && event.data.action === 'clear') {
+                receivedMessages = [];
+                document.getElementById('receivedData').style.display = 'none';
+                updateHistory();
+            }
+        });
+
+        // 更新历史
+        function updateHistory() {
+            const historyContent = document.getElementById('historyContent');
+            if (receivedMessages.length === 0) {
+                historyContent.textContent = '（无）';
+            } else {
+                historyContent.innerHTML = receivedMessages.map((msg, index) => {
+                    const data = msg.data;
+                    let html = `<div style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;">`;
+                    html += `<strong>消息 #${index + 1}</strong> (${msg.timestamp})<br>`;
+                    html += `userId: ${data.userId || 'N/A'}<br>`;
+                    html += `account: ${data.account || 'N/A'}<br>`;
+                    if (data.warning) {
+                        html += `<span style="color: #ff4500;">${data.warning}</span>`;
+                    }
+                    html += `</div>`;
+                    return html;
+                }).join('');
+            }
+        }
+    </script>
+</body>
+</html>

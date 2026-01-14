@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>场景1测试：同源iframe共享存储</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #0079d3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005fa3;
+        }
+        .result {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #0079d3;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .warning {
+            border-left-color: #ff4500;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #46d160;
+            background: #f5fff5;
+        }
+        iframe {
+            width: 100%;
+            height: 300px;
+            border: 2px solid #0079d3;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 场景1测试：同源iframe共享存储</h1>
+    
+    <div class="section">
+        <h2>📋 测试说明</h2>
+        <p><strong>测试目标：</strong>验证同源iframe是否能访问父页面的localStorage</p>
+        <p><strong>测试步骤：</strong></p>
+        <ol>
+            <li>在账号A下，点击"账号A：写入测试数据"</li>
+            <li>查看父页面和iframe的localStorage</li>
+            <li>切换到账号B</li>
+            <li>刷新页面，查看iframe是否仍能看到账号A的数据</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>🎮 操作</h2>
+        <button onclick="writeAccountAData()">账号A：写入测试数据</button>
+        <button onclick="readParentData()">读取父页面数据</button>
+        <button onclick="readIframeData()">读取iframe数据</button>
+        <button onclick="clearAllData()">清空所有数据</button>
+    </div>
+
+    <div class="section">
+        <h2>📄 父页面结果</h2>
+        <div id="parentResult" class="result">点击"读取父页面数据"查看</div>
+    </div>
+
+    <div class="section">
+        <h2>🖼️ 同源iframe（测试iframe）</h2>
+        <iframe id="testIframe" src="iframe测试-场景1-同源iframe内容.html"></iframe>
+    </div>
+
+    <div class="section">
+        <h2>📊 iframe结果</h2>
+        <div id="iframeResult" class="result">点击"读取iframe数据"查看</div>
+    </div>
+
+    <script>
+        // 账号A写入数据
+        function writeAccountAData() {
+            const timestamp = new Date().toISOString();
+            localStorage.setItem('test_account_A', 'account_A_data_' + timestamp);
+            localStorage.setItem('test_account_A_userId', 'user_12345');
+            localStorage.setItem('test_account_A_token', 'token_abc123');
+            
+            document.getElementById('parentResult').textContent = 
+                '✅ 账号A数据已写入：\n' +
+                'test_account_A: ' + localStorage.getItem('test_account_A') + '\n' +
+                'test_account_A_userId: ' + localStorage.getItem('test_account_A_userId') + '\n' +
+                'test_account_A_token: ' + localStorage.getItem('test_account_A_token');
+            document.getElementById('parentResult').className = 'result success';
+        }
+
+        // 读取父页面数据
+        function readParentData() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                data[key] = localStorage.getItem(key);
+            }
+            
+            const result = Object.keys(data).length > 0 
+                ? JSON.stringify(data, null, 2)
+                : '（空）';
+            
+            document.getElementById('parentResult').textContent = 
+                '父页面localStorage：\n' + result;
+            document.getElementById('parentResult').className = 
+                Object.keys(data).length > 0 ? 'result warning' : 'result';
+        }
+
+        // 读取iframe数据（通过postMessage）
+        function readIframeData() {
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({action: 'readLocalStorage'}, '*');
+        }
+
+        // 监听iframe返回的数据
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'localStorageData') {
+                const data = event.data.data;
+                const result = Object.keys(data).length > 0 
+                    ? JSON.stringify(data, null, 2)
+                    : '（空）';
+                
+                document.getElementById('iframeResult').textContent = 
+                    'iframe localStorage：\n' + result;
+                document.getElementById('iframeResult').className = 
+                    Object.keys(data).length > 0 ? 'result warning' : 'result';
+                
+                // 检查是否有账号A的数据残留
+                if (data['test_account_A']) {
+                    document.getElementById('iframeResult').textContent += 
+                        '\n\n⚠️ 警告：iframe能看到账号A的数据！存在跨账号数据残留风险！';
+                    document.getElementById('iframeResult').className = 'result warning';
+                }
+            }
+        });
+
+        // 清空所有数据
+        function clearAllData() {
+            localStorage.clear();
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({action: 'clearLocalStorage'}, '*');
+            document.getElementById('parentResult').textContent = '✅ 已清空';
+            document.getElementById('iframeResult').textContent = '✅ 已清空';
+        }
+
+        // 页面加载时自动读取
+        window.onload = function() {
+            readParentData();
+            setTimeout(readIframeData, 1000); // 等待iframe加载
+        };
+    </script>
+</body>
+</html>

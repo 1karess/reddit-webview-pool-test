@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>场景2测试：跨源iframe存储残留</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #0079d3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005fa3;
+        }
+        .result {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #0079d3;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .warning {
+            border-left-color: #ff4500;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #46d160;
+            background: #f5fff5;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #0079d3;
+            border-radius: 4px;
+        }
+        .note {
+            background: #fff9e6;
+            padding: 15px;
+            border-left: 4px solid #ff9800;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 场景2测试：跨源iframe存储残留</h1>
+    
+    <div class="section">
+        <h2>📋 测试说明</h2>
+        <p><strong>测试目标：</strong>验证跨源iframe的localStorage是否会在账号切换后残留</p>
+        <p><strong>测试步骤：</strong></p>
+        <ol>
+            <li>在账号A下，点击"账号A：让第三方iframe写入数据"</li>
+            <li>查看第三方iframe的localStorage（通过postMessage）</li>
+            <li>切换到账号B</li>
+            <li>刷新页面，查看第三方iframe是否仍能看到账号A的数据</li>
+        </ol>
+        <div class="note">
+            <strong>⚠️ 注意：</strong>由于同源策略，跨源iframe无法直接访问其localStorage。
+            我们使用postMessage让iframe自己读取并返回数据。
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🎮 操作</h2>
+        <button onclick="askIframeToWriteData()">账号A：让第三方iframe写入数据</button>
+        <button onclick="askIframeToReadData()">读取第三方iframe数据</button>
+        <button onclick="askIframeToClearData()">清空第三方iframe数据</button>
+    </div>
+
+    <div class="section">
+        <h2>🖼️ 第三方iframe（模拟第三方服务）</h2>
+        <p><strong>iframe URL：</strong><span id="iframeUrl"></span></p>
+        <iframe id="thirdPartyIframe" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+
+    <div class="section">
+        <h2>📊 第三方iframe结果</h2>
+        <div id="iframeResult" class="result">点击"读取第三方iframe数据"查看</div>
+    </div>
+
+    <script>
+        // 创建第三方iframe的URL（使用data URI模拟跨源）
+        // 实际测试中，可以使用真实的第三方域名，如：https://example.com/iframe-test.html
+        const iframeContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>第三方iframe（模拟）</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #ffe8e8;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h3>🌐 第三方iframe（模拟第三方服务）</h3>
+    <div class="info">
+        <p><strong>当前origin：</strong><span id="origin"></span></p>
+        <p><strong>localStorage数据：</strong></p>
+        <pre id="localStorageData">（空）</pre>
+    </div>
+
+    <script>
+        // 显示当前origin
+        document.getElementById('origin').textContent = window.location.origin;
+
+        // 写入测试数据（模拟第三方服务存储账号A的数据）
+        function writeAccountAData() {
+            const timestamp = new Date().toISOString();
+            localStorage.setItem('third_party_account_A', 'account_A_data_' + timestamp);
+            localStorage.setItem('third_party_userId', 'user_12345');
+            localStorage.setItem('third_party_trackingId', 'track_' + Math.random().toString(36).substr(2, 9));
+            
+            readLocalStorage();
+            
+            // 通知父页面
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'dataWritten',
+                    message: '账号A数据已写入第三方iframe的localStorage'
+                }, '*');
+            }
+        }
+
+        // 读取localStorage
+        function readLocalStorage() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                data[key] = localStorage.getItem(key);
+            }
+            
+            const result = Object.keys(data).length > 0 
+                ? JSON.stringify(data, null, 2)
+                : '（空）';
+            
+            document.getElementById('localStorageData').textContent = result;
+            
+            // 发送给父页面
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'localStorageData',
+                    data: data
+                }, '*');
+            }
+        }
+
+        // 清空localStorage
+        function clearLocalStorage() {
+            localStorage.clear();
+            readLocalStorage();
+            
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'dataCleared',
+                    message: '第三方iframe的localStorage已清空'
+                }, '*');
+            }
+        }
+
+        // 监听父页面的消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'writeData') {
+                writeAccountAData();
+            } else if (event.data && event.data.action === 'readData') {
+                readLocalStorage();
+            } else if (event.data && event.data.action === 'clearData') {
+                clearLocalStorage();
+            }
+        });
+
+        // 自动读取
+        readLocalStorage();
+    </script>
+</body>
+</html>
+        `;
+
+        // 使用blob URL创建跨源iframe（模拟）
+        const blob = new Blob([iframeContent], {type: 'text/html'});
+        const blobUrl = URL.createObjectURL(blob);
+        document.getElementById('thirdPartyIframe').src = blobUrl;
+        document.getElementById('iframeUrl').textContent = blobUrl.substring(0, 50) + '...';
+
+        // 让iframe写入数据
+        function askIframeToWriteData() {
+            const iframe = document.getElementById('thirdPartyIframe');
+            iframe.contentWindow.postMessage({action: 'writeData'}, '*');
+        }
+
+        // 读取iframe数据
+        function askIframeToReadData() {
+            const iframe = document.getElementById('thirdPartyIframe');
+            iframe.contentWindow.postMessage({action: 'readData'}, '*');
+        }
+
+        // 清空iframe数据
+        function askIframeToClearData() {
+            const iframe = document.getElementById('thirdPartyIframe');
+            iframe.contentWindow.postMessage({action: 'clearData'}, '*');
+        }
+
+        // 监听iframe返回的数据
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'localStorageData') {
+                const data = event.data.data;
+                const result = Object.keys(data).length > 0 
+                    ? JSON.stringify(data, null, 2)
+                    : '（空）';
+                
+                let resultText = '第三方iframe localStorage：\n' + result;
+                
+                // 检查是否有账号A的数据残留
+                if (data['third_party_account_A']) {
+                    resultText += '\n\n⚠️ 警告：第三方iframe能看到账号A的数据！';
+                    resultText += '\n说明：跨源iframe的localStorage在账号切换后残留！';
+                    document.getElementById('iframeResult').className = 'result warning';
+                } else {
+                    document.getElementById('iframeResult').className = 'result';
+                }
+                
+                document.getElementById('iframeResult').textContent = resultText;
+            } else if (event.data && event.data.type === 'dataWritten') {
+                document.getElementById('iframeResult').textContent = 
+                    '✅ ' + event.data.message;
+                document.getElementById('iframeResult').className = 'result success';
+            } else if (event.data && event.data.type === 'dataCleared') {
+                document.getElementById('iframeResult').textContent = 
+                    '✅ ' + event.data.message;
+                document.getElementById('iframeResult').className = 'result success';
+            }
+        });
+
+        // 页面加载时自动读取
+        window.onload = function() {
+            setTimeout(askIframeToReadData, 1000); // 等待iframe加载
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>场景4测试：postMessage传递错误数据</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #0079d3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005fa3;
+        }
+        .result {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #0079d3;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .warning {
+            border-left-color: #ff4500;
+            background: #fff5f5;
+        }
+        .success {
+            border-left-color: #46d160;
+            background: #f5fff5;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #0079d3;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 场景4测试：postMessage传递错误数据</h1>
+    
+    <div class="section">
+        <h2>📋 测试说明</h2>
+        <p><strong>测试目标：</strong>验证账号切换后，父页面是否仍会发送账号A的数据给iframe</p>
+        <p><strong>测试步骤：</strong></p>
+        <ol>
+            <li>在账号A下，点击"账号A：发送数据给iframe"</li>
+            <li>查看iframe收到的数据</li>
+            <li>切换到账号B</li>
+            <li>点击"账号B：发送数据给iframe"（但可能发送的是账号A的数据）</li>
+            <li>查看iframe是否收到错误的数据</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>🎮 操作</h2>
+        <button onclick="sendAccountAData()">账号A：发送数据给iframe</button>
+        <button onclick="sendAccountBData()">账号B：发送数据给iframe</button>
+        <button onclick="readLocalStorage()">读取父页面localStorage</button>
+        <button onclick="clearAllData()">清空所有数据</button>
+    </div>
+
+    <div class="section">
+        <h2>📄 父页面localStorage</h2>
+        <div id="parentStorage" class="result">点击"读取父页面localStorage"查看</div>
+    </div>
+
+    <div class="section">
+        <h2>🖼️ iframe（模拟第三方服务）</h2>
+        <iframe id="testIframe" src="iframe测试-场景4-iframe内容.html"></iframe>
+    </div>
+
+    <div class="section">
+        <h2>📊 iframe收到的数据</h2>
+        <div id="iframeResult" class="result">等待iframe接收数据...</div>
+    </div>
+
+    <script>
+        // 账号A写入数据并发送给iframe
+        function sendAccountAData() {
+            // 写入账号A的数据到localStorage
+            localStorage.setItem('current_user_id', 'user_account_A');
+            localStorage.setItem('current_token', 'token_account_A_abc123');
+            localStorage.setItem('current_account', 'account_A');
+            
+            // 从localStorage读取数据（模拟从存储中获取用户数据）
+            const userData = {
+                userId: localStorage.getItem('current_user_id'),
+                token: localStorage.getItem('current_token'),
+                account: localStorage.getItem('current_account'),
+                timestamp: new Date().toISOString()
+            };
+            
+            // 发送给iframe
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({
+                type: 'userData',
+                data: userData,
+                source: 'parent_page'
+            }, '*');
+            
+            document.getElementById('parentStorage').textContent = 
+                '✅ 账号A数据已写入并发送：\n' +
+                JSON.stringify(userData, null, 2);
+            document.getElementById('parentStorage').className = 'result success';
+        }
+
+        // 账号B发送数据给iframe（但可能读取到账号A的数据）
+        function sendAccountBData() {
+            // ⚠️ 关键：从localStorage读取数据
+            // 如果账号切换后localStorage没清理，这里会读取到账号A的数据
+            const userData = {
+                userId: localStorage.getItem('current_user_id'),  // 可能是账号A的
+                token: localStorage.getItem('current_token'),      // 可能是账号A的
+                account: localStorage.getItem('current_account'),   // 可能是账号A的
+                timestamp: new Date().toISOString(),
+                expectedAccount: 'account_B'  // 期望是账号B
+            };
+            
+            // 检查是否读取到了错误的数据
+            if (userData.userId === 'user_account_A' || userData.account === 'account_A') {
+                userData.warning = '⚠️ 警告：读取到了账号A的数据！存在跨账号数据残留！';
+            }
+            
+            // 发送给iframe
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({
+                type: 'userData',
+                data: userData,
+                source: 'parent_page'
+            }, '*');
+            
+            let resultText = '账号B尝试发送数据：\n' + JSON.stringify(userData, null, 2);
+            if (userData.warning) {
+                resultText += '\n\n' + userData.warning;
+                document.getElementById('parentStorage').className = 'result warning';
+            } else {
+                document.getElementById('parentStorage').className = 'result success';
+            }
+            document.getElementById('parentStorage').textContent = resultText;
+        }
+
+        // 读取父页面localStorage
+        function readLocalStorage() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                data[key] = localStorage.getItem(key);
+            }
+            
+            const result = Object.keys(data).length > 0 
+                ? JSON.stringify(data, null, 2)
+                : '（空）';
+            
+            document.getElementById('parentStorage').textContent = 
+                '父页面localStorage：\n' + result;
+            document.getElementById('parentStorage').className = 
+                Object.keys(data).length > 0 ? 'result warning' : 'result';
+        }
+
+        // 清空所有数据
+        function clearAllData() {
+            localStorage.clear();
+            const iframe = document.getElementById('testIframe');
+            iframe.contentWindow.postMessage({action: 'clear'}, '*');
+            document.getElementById('parentStorage').textContent = '✅ 已清空';
+            document.getElementById('iframeResult').textContent = '✅ 已清空';
+        }
+
+        // 页面加载时自动读取
+        window.onload = function() {
+            readLocalStorage();
+        };
+    </script>
+</body>
+</html>

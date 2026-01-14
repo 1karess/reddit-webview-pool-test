@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>iframe内容（window.name测试）</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #e8f4f8;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h3>🖼️ 这是同源iframe</h3>
+    <div class="info">
+        <p><strong>当前origin：</strong><span id="origin"></span></p>
+        <p><strong>window.name：</strong></p>
+        <pre id="windowNameData">（空）</pre>
+        <p><strong>⚠️ 注意：</strong>iframe的window.name通常继承自父页面，但某些情况下可能不同。</p>
+    </div>
+
+    <script>
+        // 显示当前origin
+        document.getElementById('origin').textContent = window.location.origin;
+
+        // 读取window.name
+        function readWindowName() {
+            // 尝试多种方式读取window.name
+            let windowName = '';
+            
+            // 方式1：直接读取
+            try {
+                windowName = window.name || '';
+            } catch (e) {
+                console.log('无法直接读取window.name:', e);
+            }
+            
+            // 方式2：尝试从父页面读取（如果同源）
+            if (!windowName && window.parent !== window) {
+                try {
+                    windowName = window.parent.name || '';
+                } catch (e) {
+                    console.log('无法从父页面读取window.name（可能是跨源）:', e);
+                }
+            }
+            
+            // 显示结果
+            if (windowName && windowName.trim() !== '') {
+                try {
+                    const bridgeContext = JSON.parse(windowName);
+                    document.getElementById('windowNameData').textContent = 
+                        JSON.stringify(bridgeContext, null, 2);
+                } catch (e) {
+                    document.getElementById('windowNameData').textContent = 
+                        windowName.substring(0, 500);
+                }
+            } else {
+                document.getElementById('windowNameData').textContent = '（空）';
+            }
+            
+            // 发送给父页面
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'windowNameData',
+                    windowName: windowName
+                }, '*');
+            }
+        }
+
+        // 清空window.name
+        function clearWindowName() {
+            window.name = '';
+            readWindowName();
+        }
+
+        // 监听父页面的消息
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'readWindowName') {
+                readWindowName();
+            } else if (event.data && event.data.action === 'clearWindowName') {
+                clearWindowName();
+            }
+        });
+
+        // 自动读取
+        readWindowName();
+        
+        // 定期更新（每2秒）
+        setInterval(readWindowName, 2000);
+    </script>
+</body>
+</html>
