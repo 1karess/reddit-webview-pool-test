@@ -51,10 +51,13 @@
     <p>
       来自网站A的跳转参数 tid: <code id="tid">(none)</code>
       <br />
+      已归因并保存到本域 last_tid: <code id="lastTid">(none)</code>
+      <br />
       <small>说明：跨域时，网站B读不到网站A的 localStorage/cookie；但如果 A 把 ID 放进 URL 参数（tid），B 可以读取并用于“跨域关联”。</small>
     </p>
     <p>
-      <button class="secondary" onclick="saveTid()">把 tid 保存到本域 localStorage（last_tid）</button>
+      <button class="secondary" onclick="saveTid()">手动保存 tid → last_tid</button>
+      <button class="secondary" onclick="clearLastTid()">清除 last_tid</button>
     </p>
 
     <div class="row">
@@ -69,14 +72,33 @@
       document.getElementById("origin").textContent = window.location.origin;
       const tid = new URLSearchParams(window.location.search).get("tid");
       document.getElementById("tid").textContent = tid || "(none)";
+      const LAST_TID_KEY = "last_tid";
+
+      function refreshLastTid() {
+        document.getElementById("lastTid").textContent =
+          localStorage.getItem(LAST_TID_KEY) || "(none)";
+      }
+
+      // Auto-attribution: if tid exists, persist it on B (this origin).
+      if (tid) {
+        localStorage.setItem(LAST_TID_KEY, tid);
+      }
+      refreshLastTid();
 
       function saveTid() {
         if (!tid) {
           document.getElementById("result").innerHTML = "❌ 当前 URL 没有 tid 参数";
           return;
         }
-        localStorage.setItem("last_tid", tid);
+        localStorage.setItem(LAST_TID_KEY, tid);
+        refreshLastTid();
         document.getElementById("result").innerHTML = "✅ 已保存 last_tid: " + tid;
+      }
+
+      function clearLastTid() {
+        localStorage.removeItem(LAST_TID_KEY);
+        refreshLastTid();
+        document.getElementById("result").innerHTML = "🗑️ 已清除 last_tid";
       }
 
       function writeId() {
