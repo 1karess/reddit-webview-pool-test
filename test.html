@@ -73,15 +73,19 @@
       const tid = new URLSearchParams(window.location.search).get("tid");
       document.getElementById("tid").textContent = tid || "(none)";
       const LAST_TID_KEY = "last_tid";
+      const TRACKER_KEY = "tracker_id";
 
       function refreshLastTid() {
         document.getElementById("lastTid").textContent =
           localStorage.getItem(LAST_TID_KEY) || "(none)";
       }
 
-      // Auto-attribution: if tid exists, persist it on B (this origin).
+      // Auto-attribution (real-world pattern):
+      // If tid exists, persist it on B (this origin) as the user's attribution ID.
       if (tid) {
         localStorage.setItem(LAST_TID_KEY, tid);
+        // Also write to the main tracker key so "读取ID" can read it.
+        localStorage.setItem(TRACKER_KEY, tid);
       }
       refreshLastTid();
 
@@ -91,6 +95,7 @@
           return;
         }
         localStorage.setItem(LAST_TID_KEY, tid);
+        localStorage.setItem(TRACKER_KEY, tid);
         refreshLastTid();
         document.getElementById("result").innerHTML = "✅ 已保存 last_tid: " + tid;
       }
@@ -103,24 +108,24 @@
 
       function writeId() {
         const id = "user_" + Date.now();
-        localStorage.setItem("tracker_id", id);
+        localStorage.setItem(TRACKER_KEY, id);
         document.getElementById("result").innerHTML = "✅ 写入: " + id;
       }
 
       function readId() {
-        const id = localStorage.getItem("tracker_id");
+        const id = localStorage.getItem(TRACKER_KEY);
         if (id) {
           document.getElementById("result").innerHTML =
-            "🎯 读到了: " + id + "<br>可能存在跨APP共享!";
+            "🎯 读到了 tracker_id: " + id + "<br>（这是网站B本域保存的归因/追踪ID）";
         } else {
           document.getElementById("result").innerHTML =
-            "❌ 没读到数据<br>跨APP隔离正常";
+            "❌ 没读到 tracker_id<br>说明当前 B 域还没落库归因ID";
         }
       }
 
       function clearId() {
-        localStorage.removeItem("tracker_id");
-        document.getElementById("result").innerHTML = "🗑️ 已清除 tracker_id";
+        localStorage.removeItem(TRACKER_KEY);
+        document.getElementById("result").innerHTML = "🗑️ 已清除 tracker_id（本域）";
       }
     </script>
   </body>
