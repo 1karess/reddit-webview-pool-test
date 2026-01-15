@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Top Site A (GitHub Pages) - Third-party Storage Test</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.5; }
+      .hint { background: #f6f8fa; border: 1px solid #e5e7eb; padding: 12px; border-radius: 12px; }
+      iframe { width: 100%; height: 440px; border: 3px solid #ff4d5a; border-radius: 12px; }
+      code { background: #f6f8fa; padding: 2px 6px; border-radius: 6px; }
+      pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <h1>站点 A（顶层站点 / GitHub Pages）</h1>
+    <div class="hint">
+      <p>
+        红框是 <b>第三方 C（独立域名 iframe）</b>。本页会让 C 自动写入它自己的
+        <code>localStorage</code>/<code>Cookie</code>/<code>IndexedDB</code>。
+        然后去站点 B（另一个域名）加载同一个 C，看看能否读到同样的值。
+      </p>
+      <p>
+        本页 Origin：<code id="origin"></code><br />
+        UA：<code id="ua"></code>
+      </p>
+    </div>
+
+    <h2 style="margin: 14px 0 8px;">第三方 C（iframe）</h2>
+    <iframe id="tracker"></iframe>
+
+    <div class="hint" style="margin-top:12px;">
+      <p><b>站点A收到的第三方回传结果（postMessage）</b></p>
+      <pre id="tpResult">等待第三方回传…</pre>
+    </div>
+
+    <script>
+      document.getElementById("origin").textContent = location.origin;
+      document.getElementById("ua").textContent = navigator.userAgent.slice(0, 160) + (navigator.userAgent.length > 160 ? "…" : "");
+
+      // Third-party C (different origin from this GitHub Pages origin)
+      const TRACKER_URL = "https://vercel-thirdparty-tracker-a06d6u3es-karess-projects.vercel.app/?auto=write";
+      document.getElementById("tracker").src = TRACKER_URL;
+
+      window.addEventListener("message", (ev) => {
+        const d = ev?.data;
+        if (!d || d.type !== "tp_storage_result") return;
+        document.getElementById("tpResult").textContent = JSON.stringify(d, null, 2);
+      });
+    </script>
+  </body>
+</html>
