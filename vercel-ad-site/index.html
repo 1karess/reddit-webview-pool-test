@@ -28,7 +28,8 @@
 
     <p>
       当前 Origin：<code id="origin"></code><br />
-      当前 tracker_id（本域 localStorage）：<code id="currentId">(none)</code>
+      当前 tracker_id（本域 localStorage）：<code id="currentId">(none)</code><br />
+      当前 tracker_id（本域 Cookie）：<code id="currentCookie">(none)</code>
     </p>
 
     <label for="target">网站 B（shop-site）URL（可改）：</label>
@@ -47,6 +48,7 @@
 
     <script>
       const KEY = "tracker_id";
+      const COOKIE_NAME = "tracker_id";
       const DEFAULT_TARGET = "https://1karess.github.io/reddit-webview-pool-test/test.html";
 
       document.getElementById("origin").textContent = window.location.origin;
@@ -57,8 +59,27 @@
         return "A_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
       }
 
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+        return match ? decodeURIComponent(match[2]) : null;
+      }
+
+      function setTrackerCookie(value) {
+        // 30 days
+        document.cookie =
+          COOKIE_NAME +
+          "=" +
+          encodeURIComponent(value) +
+          "; Max-Age=2592000; Path=/; SameSite=Lax";
+      }
+
+      function clearTrackerCookie() {
+        document.cookie = COOKIE_NAME + "=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; SameSite=Lax";
+      }
+
       function refreshCurrentId() {
         document.getElementById("currentId").textContent = localStorage.getItem(KEY) || "(none)";
+        document.getElementById("currentCookie").textContent = getCookie(COOKIE_NAME) || "(none)";
       }
 
       function ensureId() {
@@ -67,18 +88,31 @@
           id = newId();
           localStorage.setItem(KEY, id);
         }
+        // Keep cookie aligned with localStorage tracker_id
+        setTrackerCookie(id);
         refreshCurrentId();
         document.getElementById("out").innerHTML =
-          "✅ A 当前 tracker_id: <b>" + id + "</b><br>KEY=" + KEY;
+          "✅ A 当前 tracker_id: <b>" +
+          id +
+          "</b><br>LocalStorage KEY=" +
+          KEY +
+          "<br>Cookie NAME=" +
+          COOKIE_NAME;
         return id;
       }
 
       function rotateId() {
         const id = newId();
         localStorage.setItem(KEY, id);
+        setTrackerCookie(id);
         refreshCurrentId();
         document.getElementById("out").innerHTML =
-          "🔁 A 已强制更新 tracker_id: <b>" + id + "</b><br>KEY=" + KEY;
+          "🔁 A 已强制更新 tracker_id: <b>" +
+          id +
+          "</b><br>LocalStorage KEY=" +
+          KEY +
+          "<br>Cookie NAME=" +
+          COOKIE_NAME;
         return id;
       }
 
@@ -97,6 +131,7 @@
 
       function clearAll() {
         localStorage.removeItem(KEY);
+        clearTrackerCookie();
         document.getElementById("out").innerHTML = "🗑️ 已清除本域 localStorage tracker_id";
         refreshCurrentId();
       }
