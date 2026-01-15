@@ -26,14 +26,18 @@
       注意：<b>跨域时，网站 B 正常情况下读不到网站 A 的 localStorage/cookie</b>；现实里的“跨域追踪”通常靠 URL 参数/重定向等手段。
     </p>
 
-    <p>当前 Origin：<code id="origin"></code></p>
+    <p>
+      当前 Origin：<code id="origin"></code><br />
+      当前 tracker_id（本域 localStorage）：<code id="currentId">(none)</code>
+    </p>
 
     <label for="target">网站 B（shop-site）URL（可改）：</label>
     <input id="target" />
     <small>默认填：你的 GitHub Pages `test.html`（同一个人点击同一条链接即可）</small>
 
     <div class="row">
-      <button onclick="writeOnly()">只写入 tracker_id</button>
+      <button onclick="ensureId()">生成/复用 tracker_id</button>
+      <button class="secondary" onclick="rotateId()">强制生成新 tracker_id</button>
       <button onclick="go(false)">跳转到网站B（不带参数）</button>
       <button onclick="go(true)">跳转到网站B（带 ?tid=... 参数）</button>
       <button class="secondary" onclick="clearAll()">清除本域 tracker_id</button>
@@ -53,16 +57,33 @@
         return "A_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
       }
 
-      function writeOnly() {
+      function refreshCurrentId() {
+        document.getElementById("currentId").textContent = localStorage.getItem(KEY) || "(none)";
+      }
+
+      function ensureId() {
+        let id = localStorage.getItem(KEY);
+        if (!id) {
+          id = newId();
+          localStorage.setItem(KEY, id);
+        }
+        refreshCurrentId();
+        document.getElementById("out").innerHTML =
+          "✅ A 当前 tracker_id: <b>" + id + "</b><br>KEY=" + KEY;
+        return id;
+      }
+
+      function rotateId() {
         const id = newId();
         localStorage.setItem(KEY, id);
+        refreshCurrentId();
         document.getElementById("out").innerHTML =
-          "✅ A 写入 localStorage: <b>" + id + "</b><br>KEY=" + KEY;
+          "🔁 A 已强制更新 tracker_id: <b>" + id + "</b><br>KEY=" + KEY;
         return id;
       }
 
       function go(withParam) {
-        const id = writeOnly();
+        const id = ensureId();
         let url = (targetEl.value || DEFAULT_TARGET).trim();
         try {
           const u = new URL(url);
@@ -77,7 +98,10 @@
       function clearAll() {
         localStorage.removeItem(KEY);
         document.getElementById("out").innerHTML = "🗑️ 已清除本域 localStorage tracker_id";
+        refreshCurrentId();
       }
+
+      refreshCurrentId();
     </script>
   </body>
 </html>

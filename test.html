@@ -53,6 +53,9 @@
       <br />
       <small>说明：跨域时，网站B读不到网站A的 localStorage/cookie；但如果 A 把 ID 放进 URL 参数（tid），B 可以读取并用于“跨域关联”。</small>
     </p>
+    <p>
+      <button class="secondary" onclick="saveTid()">把 tid 保存到本域 localStorage（last_tid）</button>
+    </p>
 
     <div class="row">
       <button onclick="writeId()">写入ID</button>
@@ -64,8 +67,17 @@
 
     <script>
       document.getElementById("origin").textContent = window.location.origin;
-      document.getElementById("tid").textContent =
-        new URLSearchParams(window.location.search).get("tid") || "(none)";
+      const tid = new URLSearchParams(window.location.search).get("tid");
+      document.getElementById("tid").textContent = tid || "(none)";
+
+      function saveTid() {
+        if (!tid) {
+          document.getElementById("result").innerHTML = "❌ 当前 URL 没有 tid 参数";
+          return;
+        }
+        localStorage.setItem("last_tid", tid);
+        document.getElementById("result").innerHTML = "✅ 已保存 last_tid: " + tid;
+      }
 
       function writeId() {
         const id = "user_" + Date.now();
