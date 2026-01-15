@@ -48,6 +48,11 @@
       当前 Origin: <code id="origin"></code><br />
       Key: <code>tracker_id</code>
     </p>
+    <p>
+      来自网站A的跳转参数 tid: <code id="tid">(none)</code>
+      <br />
+      <small>说明：跨域时，网站B读不到网站A的 localStorage/cookie；但如果 A 把 ID 放进 URL 参数（tid），B 可以读取并用于“跨域关联”。</small>
+    </p>
 
     <div class="row">
       <button onclick="writeId()">写入ID</button>
@@ -59,6 +64,8 @@
 
     <script>
       document.getElementById("origin").textContent = window.location.origin;
+      document.getElementById("tid").textContent =
+        new URLSearchParams(window.location.search).get("tid") || "(none)";
 
       function writeId() {
         const id = "user_" + Date.now();
